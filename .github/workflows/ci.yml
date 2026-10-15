@@ -1,0 +1,62 @@
+# Validate, diff and run the fixtures of every agent with the tap release
+# pinned in tap.version. No cluster, registry or signing credentials: this
+# runs on pull requests, including the factory's.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agents:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tapctl diff reads the base branch's agent.yaml
+      # Same interpreter versions as tap's images/runner-node and images/runner-python.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.3
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.13.16
+      - name: tap release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./fetch-tap.sh
+      - name: validate, diff, fixtures
+        env:
+          BASE: git:origin/${{ github.base_ref || 'main' }}
+        run: |
+          failed=0
+          echo "## Agents (tap $(cat tap.version); permission diff vs ${BASE#git:})" >> "$GITHUB_STEP_SUMMARY"
+          for dir in agents/*/; do
+            agent=$(basename "$dir")
+            echo "::group::$agent"
+            .tap/tapctl validate --platform .tap/platform.yaml "$dir" || { echo "::error::$agent: validation failed"; failed=1; }
+            set +e
+            diff=$(.tap/tapctl diff --platform .tap/platform.yaml --base "$BASE" "$dir" 2>&1); rc=$?
+            set -e
+            echo "$diff"
+            case $rc in
+              0) ;;
+              3) echo "::warning::$agent: permissions widened; human review required"
+                 { echo "### $agent: permissions widened"; echo '```'; echo "$diff"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" ;;
+              *) echo "::error::$agent: diff failed (exit $rc)"; failed=1 ;;
+            esac
+            mkdir -p ".tap/ws/$agent"
+            .tap/tap-runner test --bundle "$dir" --tests "$dir/tests" --workspace ".tap/ws/$agent" --interpreters-file "" \
+              --interpreter-path node="$(command -v node)" --interpreter-path python3="$(command -v python3)" \
+              || { echo "::error::$agent: fixtures failed"; failed=1; }
+            echo "::endgroup::"
+          done
+          exit $failed
