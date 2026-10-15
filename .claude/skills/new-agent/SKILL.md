@@ -81,7 +81,7 @@ Run `task agent:diff AGENT=<name>`. For a new agent this exits 3 and lists every
 
 `agent:diff` lists tools, effects, egress and secrets; `effectsPolicy` is printed on its first line. `task` prints `Failed ... exit status 3` for a new agent; that's the expected "review required" result, not an error.
 
-Deploying is `task agent:dev AGENT=<name>`, or `task agent:launch AGENT=<name>` for an agent that has just merged (it also checks that main is current and the secrets are in OpenBao, and runs a smoke chat). Only run either when the user asks. After deploying, wait about 10 seconds before the first chat (new pods are briefly blocked by the network policy controller).
+Deploying is merging the PR. The publish workflow builds, tests and signs the bundle in CI, Flux applies it, and the merge commit gets a `tap/deploy` status. Never deploy by hand: `agent:deploy`, `agent:dev` and `agent:launch` refuse agents that Flux manages. Declared secrets must be in OpenBao before the merge, or `tap/deploy` fails. After a deploy, wait about 10 seconds before the first chat (new pods are briefly blocked by the network policy controller).
 
 ## Changing an existing agent
 

@@ -1,7 +1,8 @@
 # On every push to main: build, push and sign the bundles whose sources
 # changed, run their fixtures in the cluster (real runner image, gVisor),
 # attest and sign them as tested, then publish every agent's manifests as one
-# signed OCI artifact for Flux. No laptop and no stored credentials:
+# signed OCI artifact, wait for Flux to apply it and report the result as the
+# commit status tap/deploy. No laptop and no stored credentials:
 #   - the tailnet: Tailscale workload identity federation (vars.TS_CLIENT_ID,
 #     vars.TS_AUDIENCE), node tag tag:tap-ci;
 #   - OpenBao (Transit signing, zot password, a short-lived Kubernetes token):
@@ -149,3 +150,37 @@ jobs:
           bao_login tap-ci-build
           registry_login
           ci/publish.sh
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: status pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=pending -f context=tap/deploy -f description="Flux is applying this commit" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
+      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:tap-ci
+      - uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
+      - name: wait for Flux
+        run: |
+          . ci/lib.sh
+          bao_login tap-ci-build
+          kube_login
+          ci/wait-flux.sh
+      - name: status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          case "$RESULT" in success) state=success desc="Flux applied this commit; all agents ready" ;; *) state=failure desc="Flux did not apply this commit (see the run)" ;; esac
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state="$state" -f context=tap/deploy -f description="$desc" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
