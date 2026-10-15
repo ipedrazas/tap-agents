@@ -1,0 +1,133 @@
+version: "3"
+
+# Authoring tasks run here, with the tap release pinned in tap.version
+# (./fetch-tap.sh puts tapctl, tap-runner and platform.yaml in .tap/).
+#
+# Tasks that need the cluster, the registry or OpenBao (test in tap-ci, sign,
+# deploy, store secrets) run in a tap checkout at TAP_DIR, on this repo's
+# agents. They move to CI and Flux in phases 4 and 5 of tap's
+# docs/gitops-plan.md.
+
+vars:
+  TAPCTL: .tap/tapctl
+  PLATFORM: .tap/platform.yaml
+  TAP_DIR: '{{.TAP_DIR | default "../tap"}}'
+  AGENTS_DIR: "{{.ROOT_DIR}}/agents"
+
+tasks:
+  fetch:
+    desc: Download the pinned tap release (tap.version) into .tap/
+    run: once
+    sources: [tap.version]
+    status: ['[ "$(cat .tap/version 2>/dev/null | cut -d- -f1)" = "$(cat tap.version)" ]']
+    cmds:
+      - ./fetch-tap.sh
+
+  # ---- authoring --------------------------------------------------------------
+
+  agent:new:
+    desc: Scaffold a new agent that validates as-is (NAME, RUNNER=runner-node|runner-python, DESCRIPTION, OWNER)
+    deps: [fetch]
+    requires: { vars: [NAME] }
+    cmds:
+      - '{{.TAPCTL}} new --platform {{.PLATFORM}} {{.NAME}} --runner {{.RUNNER | default "runner-node"}} --owner "{{.OWNER | default "platform"}}" --description "{{.DESCRIPTION | default "Describe what this agent does in one sentence"}}"'
+
+  agent:validate:
+    desc: Validate an agent bundle (AGENT=name)
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    cmds:
+      - "{{.TAPCTL}} validate --platform {{.PLATFORM}} agents/{{.AGENT}}"
+
+  agent:diff:
+    desc: Permission diff against BASE (default git:HEAD); exit 3 means review required
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    cmds:
+      - '{{.TAPCTL}} diff --platform {{.PLATFORM}} --base {{.BASE | default "git:HEAD"}} agents/{{.AGENT}}'
+
+  agent:test:local:
+    desc: Run fixtures on this machine (fast loop; agent:test is the real gate). NODE/PYTHON override interpreter paths (not mise shims); VERBOSE=1 shows tool stderr
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    vars:
+      NODE: '{{.NODE | default "/opt/homebrew/bin/node"}}'
+      PYTHON: '{{.PYTHON | default "/opt/homebrew/bin/python3"}}'
+    cmds:
+      - mkdir -p .tap/ws/{{.AGENT}}
+      - |
+        .tap/tap-runner test --bundle agents/{{.AGENT}} --tests agents/{{.AGENT}}/tests \
+          --workspace .tap/ws/{{.AGENT}} --interpreters-file "" \
+          --interpreter-path node={{.NODE}} --interpreter-path python3={{.PYTHON}} {{if not .VERBOSE}}2>/dev/null{{end}}
+
+  agent:mcp-list:
+    desc: List every tool the agent's MCP servers offer (to choose the allowlist)
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    cmds:
+      - "{{.TAPCTL}} mcp list agents/{{.AGENT}}"
+
+  agent:mcp-snapshot:
+    desc: Pin the agent's allowlisted MCP tool schemas (review the diff of mcp/*.tools.json)
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    cmds:
+      - "{{.TAPCTL}} mcp snapshot agents/{{.AGENT}}"
+
+  agent:mcp-check:
+    desc: Fail if a live MCP server's schemas differ from the pinned ones
+    deps: [fetch]
+    requires: { vars: [AGENT] }
+    cmds:
+      - "{{.TAPCTL}} mcp snapshot --check agents/{{.AGENT}}"
+
+  agent:mcp-call:
+    desc: "One live MCP call for recording fixtures: TOOL=<server>__<tool> ARGS='{...}' (secrets from .env.<agent>)"
+    deps: [fetch]
+    requires: { vars: [AGENT, TOOL] }
+    cmds:
+      - "{{.TAPCTL}} mcp call agents/{{.AGENT}} {{.TOOL}} '{{.ARGS | default \"{}\"}}'"
+
+  # ---- cluster, registry and OpenBao (run in the tap checkout) -----------------
+
+  agent:test:
+    desc: "Fixtures in the real runner image under gVisor; signs and attests a passing run (in TAP_DIR)"
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:test AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}}
+
+  agent:verify:
+    desc: Verify the last pushed bundle's signatures and attestation, as admission will (in TAP_DIR)
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:verify AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}}
+
+  agent:deploy:
+    desc: Deploy the last tested bundle (in TAP_DIR)
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:deploy AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}}
+
+  agent:dev:
+    desc: Validate, test, deploy (in TAP_DIR)
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:dev AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}}
+
+  agent:launch:
+    desc: "Launch a merged agent: main is current, secrets in OpenBao, test, deploy, smoke chat (in TAP_DIR)"
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:launch AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}} {{if .MESSAGE}}MESSAGE="{{.MESSAGE}}"{{end}}
+
+  agent:logs:
+    desc: Tail harness and runner logs
+    requires: { vars: [AGENT] }
+    cmds:
+      - kubectl -n agent-{{.AGENT}} logs deploy/agent --all-containers --prefix -f --tail=100
+
+  secrets:put:
+    desc: "Store one agent secret in OpenBao from stdin: pbpaste | task secrets:put AGENT=<name> NAME=<NAME> (in TAP_DIR)"
+    requires: { vars: [AGENT, NAME] }
+    cmds:
+      - task -d {{.TAP_DIR}} secrets:put AGENT={{.AGENT}} NAME={{.NAME}} AGENTS_DIR={{.AGENTS_DIR}}
