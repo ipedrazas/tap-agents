@@ -153,6 +153,9 @@ jobs:
 
   deploy:
     needs: publish
+    # publish runs after skipped build/test jobs (no agent changed); a job
+    # downstream of a skipped one is skipped too unless its condition says so.
+    if: always() && needs.publish.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
