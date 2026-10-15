@@ -120,6 +120,18 @@ tasks:
     cmds:
       - task -d {{.TAP_DIR}} agent:launch AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}} {{if .MESSAGE}}MESSAGE="{{.MESSAGE}}"{{end}}
 
+  agent:preview:
+    desc: "Run this branch's agent in the cluster before merging, as <AGENT>-dev: fixtures in tap-ci, deploy, smoke chat (in TAP_DIR). Its secrets are separate: task secrets:put ... PREVIEW=1"
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:preview AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}} {{if .MESSAGE}}MESSAGE="{{.MESSAGE}}"{{end}}
+
+  agent:preview:rm:
+    desc: Delete an agent's preview (in TAP_DIR)
+    requires: { vars: [AGENT] }
+    cmds:
+      - task -d {{.TAP_DIR}} agent:preview:rm AGENT={{.AGENT}} AGENTS_DIR={{.AGENTS_DIR}}
+
   agent:logs:
     desc: Tail harness and runner logs
     requires: { vars: [AGENT] }
@@ -127,7 +139,7 @@ tasks:
       - kubectl -n agent-{{.AGENT}} logs deploy/agent --all-containers --prefix -f --tail=100
 
   secrets:put:
-    desc: "Store one agent secret in OpenBao from stdin: pbpaste | task secrets:put AGENT=<name> NAME=<NAME> (in TAP_DIR)"
+    desc: "Store one agent secret in OpenBao from stdin: pbpaste | task secrets:put AGENT=<name> NAME=<NAME> [PREVIEW=1] (in TAP_DIR)"
     requires: { vars: [AGENT, NAME] }
     cmds:
-      - task -d {{.TAP_DIR}} secrets:put AGENT={{.AGENT}} NAME={{.NAME}} AGENTS_DIR={{.AGENTS_DIR}}
+      - task -d {{.TAP_DIR}} secrets:put AGENT={{.AGENT}} NAME={{.NAME}} AGENTS_DIR={{.AGENTS_DIR}} {{if .PREVIEW}}PREVIEW=1{{end}}

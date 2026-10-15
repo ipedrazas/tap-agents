@@ -21,6 +21,8 @@ Merging to main deploys:
 
 Store an agent's secrets before merging (`task secrets:put`). Reverting a commit rolls it back.
 
+To try a PR in the cluster before merging, check out its branch and run `task agent:preview AGENT=<name>`. This runs the fixtures in `tap-ci`, then deploys `<name>-dev` at `https://<name>-dev.a.hiddenfield.dev`, in its own namespace, with its own secrets (`secrets:put ... PREVIEW=1`), egress key and allowlist. Admission accepts its bundle signed as built; only CI signs as tested. Remove it with `task agent:preview:rm AGENT=<name>`.
+
 Tasks that need the cluster, the registry or OpenBao (`agent:test`, `agent:verify`, `secrets:put`) run in a tap checkout at `TAP_DIR` (default `../tap`). `agent:deploy`, `agent:dev` and `agent:launch` refuse agents that Flux manages.
 
 CI (`.github/workflows/ci.yml`) validates every agent, prints the permission diff against the base branch (a widening needs human review), and runs the fixtures with the same Node and Python versions as tap's runner images. It has no cluster, registry or signing credentials.
