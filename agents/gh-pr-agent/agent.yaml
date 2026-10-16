@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: gh-pr-agent
-  version: 0.3.0
+  version: 0.3.1
   owner: "platform"
   description: "Reviews a GitHub pull request from its metadata, annotated diff and file context: at most five evidence-backed findings, in chat or, when asked, as a PR comment (a 👍 if none)"
 
@@ -11,7 +11,8 @@ harness:
   model:
     provider: gateway
     name: agent
-  maxTurns: 25
+  # Headroom for re-reading cited lines before keeping a finding.
+  maxTurns: 35
 
 # What the harness does before calling a write/irreversible tool: auto | deny | ask.
 # Write: post_review_comment adds one PR comment and approve_with_reaction a 👍
