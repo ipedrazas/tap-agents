@@ -5,8 +5,9 @@
 # lastAppliedOriginRevision says which commit is live.
 . ci/lib.sh
 want="main@sha1:$GITHUB_SHA"
-# Fetch now rather than at the source's next one-minute interval.
-kubectl -n flux-system annotate ocirepository agents "reconcile.fluxcd.io/requestedAt=$(date +%s)" --overwrite >/dev/null
+# No nudge: the source polls every minute, and CI may not patch it (patch
+# can't be limited to the reconcile annotation, so it would also reach the
+# source's URL, tag and verify settings).
 for i in $(seq 1 60); do
   got=$(kubectl -n flux-system get kustomization agents -o jsonpath='{.status.lastAppliedOriginRevision}')
   ready=$(kubectl -n flux-system get kustomization agents -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
