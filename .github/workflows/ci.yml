@@ -51,6 +51,9 @@ jobs:
               0) ;;
               3) echo "::warning::$agent: permissions widened; human review required"
                  { echo "### $agent: permissions widened"; echo '```'; echo "$diff"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" ;;
+              # tap v0.1.3 and later: files other than agent.yaml changed.
+              4) echo "::notice::$agent: code changed; review it"
+                 { echo "### $agent: code changed"; echo '```'; echo "$diff"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" ;;
               *) echo "::error::$agent: diff failed (exit $rc)"; failed=1 ;;
             esac
             mkdir -p ".tap/ws/$agent"

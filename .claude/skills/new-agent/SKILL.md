@@ -85,4 +85,4 @@ Deploying is merging the PR. The publish workflow builds, tests and signs the bu
 
 ## Changing an existing agent
 
-Bump `metadata.version` for every change to `agent.yaml` (semver: patch for fixes, minor for new tools). Pushes of an existing version with different content are refused. Run `task agent:diff AGENT=<name>`: exit 3 means the change widens permissions, so call out exactly what widened.
+Bump `metadata.version` for every change to `agent.yaml` (semver: patch for fixes, minor for new tools). Pushes of an existing version with different content are refused. Run `task agent:diff AGENT=<name>`: exit 3 means the change widens permissions, so call out exactly what widened; exit 4 means files other than `agent.yaml` changed, so summarise the code change; exit 1 means the version wasn't bumped.
