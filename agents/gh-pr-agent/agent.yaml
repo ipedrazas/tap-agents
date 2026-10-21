@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: gh-pr-agent
-  version: 0.3.1
+  version: 0.3.2
   owner: "platform"
   description: "Reviews a GitHub pull request from its metadata, annotated diff and file context: at most five evidence-backed findings, in chat or, when asked, as a PR comment (a 👍 if none)"
 

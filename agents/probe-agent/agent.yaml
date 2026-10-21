@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: probe-agent
-  version: 0.1.4
+  version: 0.1.5
   owner: platform
   description: Red-team agent whose tools try to break isolation; used by task isolation:test, not by people
 
