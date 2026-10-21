@@ -4,6 +4,11 @@
 | --- | --- | --- |
 | `rule 2 ... never substituted into exec` | a schema property isn't used in argv | add `"--x", "{{x}}"` to `exec`, or remove the property |
 | `rule 2 ... string without pattern, enum, const or format` | unconstrained templated string | add a `pattern` that excludes a leading `-` (e.g. `"^[^-][^\\n]{0,199}$"`) |
+| `rule 2 ... pattern ... accepts "-x"` | the pattern isn't anchored, or allows a leading `-` | anchor it (`^...$`) and make the first character exclude `-` |
+| `rule 2 ... has format ... doesn't keep out a leading "-"` | `format` alone, e.g. `email` | add a `pattern`; `date`, `date-time`, `time`, `uuid`, `ipv4`, `ipv6`, `hostname` and `uri` are fine alone |
+| `rule 2 ... number without minimum` | an unbounded integer or number slot | add `minimum` (or `exclusiveMinimum`); negative values are fine if you mean them |
+| `rule 0 ... not a team in platform.yaml` | `metadata.owner` isn't a team | use a team from `.tap/platform.yaml` `teams` |
+| `rule 0 ... reserved` | name ends in `-dev` or starts with `tap-` | pick another name |
 | `rule 2 ... must be required or have a default` | optional templated property | add to `required` or give it a `default` |
 | `invalid JSON Schema ... invalid escape sequence` | ECMAScript regex syntax | rewrite for Go RE2 (`\x{00C0}`, no lookahead) |
 | `rule 1 ... must be a script under tools/` | wrong `exec[1]` | `["node", "tools/<file>.ts", ...]` |
