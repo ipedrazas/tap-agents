@@ -23,7 +23,7 @@ skills:
   - skills/exchange
 
 runner:
-  image: registry.hiddenfield.dev/tap/runner-node@sha256:43a4b81a8490d095a1d767d49a6aaf89e862f2dfe95636c2823c8c2332a44189
+  image: registry.hiddenfield.dev/tap/runner-node@sha256:2a2fbd7db2656a2ede86a47fc671ebd44f811c8baca80ae6c2772bb990cbb556
   timeout: 15s
   resources: { cpu: 250m, memory: 128Mi }
 
