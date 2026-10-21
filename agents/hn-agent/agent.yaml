@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: hn-agent
-  version: 0.1.2
+  version: 0.1.3
   owner: platform
   description: Tells you what's on the Hacker News front page right now and fetches a story's top comments, via the official Hacker News API.
 
@@ -23,7 +23,7 @@ skills:
   - skills/hn
 
 runner:
-  image: registry.hiddenfield.dev/tap/runner-python@sha256:8130e0af03b67f8baec8c6c96c6f44eb0558d3b745ee459ba1c7ea3780280d65
+  image: registry.hiddenfield.dev/tap/runner-python@sha256:108b881271cebe72017c81b90019c8644d58a84471e68f05b680cbec34edf7e0
   timeout: 15s
   resources: { cpu: 250m, memory: 128Mi }
 
