@@ -23,7 +23,32 @@ tasks:
     cmds:
       - ./fetch-tap.sh
 
+  tapctl:install:
+    desc: Install the pinned release's tapctl (tap.version) on your PATH, in INSTALL_DIR (default $(go env GOBIN), else ~/.local/bin)
+    deps: [fetch]
+    vars:
+      GO_BIN:
+        sh: 'd=$(go env GOBIN 2>/dev/null); [ -n "$d" ] || d=$(go env GOPATH 2>/dev/null)/bin; [ "$d" != /bin ] || d=$HOME/.local/bin; echo "$d"'
+      DIR: '{{.INSTALL_DIR | default .GO_BIN}}'
+    cmds:
+      - mkdir -p "{{.DIR}}"
+      - install -m 0755 {{.TAPCTL}} "{{.DIR}}/tapctl"
+      - '"{{.DIR}}/tapctl" version | head -1'
+      - |
+        found=$(command -v tapctl || true)
+        [ "$found" = "{{.DIR}}/tapctl" ] || echo "note: tapctl on your PATH is ${found:-missing}, not {{.DIR}}/tapctl" >&2
+
   # ---- authoring --------------------------------------------------------------
+
+  runner:bump:
+    desc: Point every agent (AGENT=name for one) at the curated runner digests in the pinned release's platform.yaml; then bump each changed agent's metadata.version
+    deps: [fetch]
+    cmds:
+      - |
+        for a in {{if .AGENT}}agents/{{.AGENT}}/{{else}}agents/*/{{end}}; do
+          out=$({{.TAPCTL}} runner bump --platform {{.PLATFORM}} "$a") || exit 1
+          echo "$out" | sed "s|^|$a: |"
+        done
 
   agent:new:
     desc: Scaffold a new agent that validates as-is (NAME, RUNNER=runner-node|runner-python, DESCRIPTION, OWNER)
