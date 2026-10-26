@@ -1,0 +1,15 @@
+# Replies in the shape recorded from the live server with task agent:mcp-call; values are made up.
+tool: databox__get_issues
+cases:
+  - name: "by identifier"
+    args: {"id": "ENG-42"}
+    mcp_response: {"content": [{"type": "text", "text": "{\"assignee\": \"\", \"created\": \"2026-10-01T09:00:00.000Z\", \"creator\": \"Example User\", \"description\": \"Problem: listing projects fails with \\\"Query too complex\\\".\\n\\nAcceptance criteria:\\n\\n* Root cause identified.\\n* Listing projects works end to end.\", \"id\": \"7a1f0c2e-3333-4a00-8000-000000000003\", \"identifier\": \"ENG-42\", \"labels\": [], \"priority\": \"Medium\", \"project\": \"Example Project\", \"project_id\": \"7a1f0c2e-2222-4a00-8000-000000000002\", \"state_type\": \"backlog\", \"status\": \"Backlog\", \"team\": \"ENG\", \"team_id\": \"7a1f0c2e-1111-4a00-8000-000000000001\", \"title\": \"Investigate why listing projects fails (query too complex)\", \"updated\": \"2026-10-01T09:05:00.000Z\", \"url\": \"https://linear.app/example/issue/ENG-42/investigate-why-listing-projects-fails\"}"}], "structuredContent": {"assignee": "", "created": "2026-10-01T09:00:00.000Z", "creator": "Example User", "description": "Problem: listing projects fails with \"Query too complex\".\n\nAcceptance criteria:\n\n* Root cause identified.\n* Listing projects works end to end.", "id": "7a1f0c2e-3333-4a00-8000-000000000003", "identifier": "ENG-42", "labels": [], "priority": "Medium", "project": "Example Project", "project_id": "7a1f0c2e-2222-4a00-8000-000000000002", "state_type": "backlog", "status": "Backlog", "team": "ENG", "team_id": "7a1f0c2e-1111-4a00-8000-000000000001", "title": "Investigate why listing projects fails (query too complex)", "updated": "2026-10-01T09:05:00.000Z", "url": "https://linear.app/example/issue/ENG-42/investigate-why-listing-projects-fails"}}
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["identifier", "description", "project_id"], "properties": {"identifier": {"const": "ENG-42"}}}}
+  - name: "unknown issue"
+    args: {"id": "ENG-999999"}
+    mcp_response: {"content": [{"type": "text", "text": "invalid request: Linear GraphQL error: Entity not found: Issue (Could not find referenced Issue.)"}], "isError": true}
+    expect: {"ok": false, "error_kind": "upstream"}
+  - name: "missing id"
+    args: {}
+    mcp_response: {"content": []}
+    expect: {"ok": false, "error_kind": "invalid_args"}

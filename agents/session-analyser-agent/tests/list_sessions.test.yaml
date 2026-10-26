@@ -1,0 +1,31 @@
+# ListObjectsV2 replies recorded from Tigris (gh-pr-agent's trimmed to four objects).
+tool: list_sessions
+cases:
+  - name: "newest first, capped"
+    args: {"prefix": "gh-pr-agent", "limit": 2}
+    secrets: {"SESSIONS_ACCESS_KEY_ID": "stub", "SESSIONS_SECRET_ACCESS_KEY": "stub"}
+    http:
+      - method: GET
+        url: "https://t3.storage.dev/hiddenfield-tap-sessions?list-type=2&max-keys=1000&prefix=gh-pr-agent%2F"
+        status: 200
+        headers: {"content-type": "application/xml"}
+        body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><Name>hiddenfield-tap-sessions</Name><Prefix>gh-pr-agent/</Prefix><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated><Contents><Key>gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json</Key><ETag>&#34;f8caf592f2e57460dbcf0db3d4a91dc0&#34;</ETag><Size>35883</Size><Owner><ID></ID></Owner><StorageClass>STANDARD</StorageClass><LastModified>2026-10-16T12:43:41Z</LastModified></Contents><Contents><Key>gh-pr-agent/010629547575f53380eee6b16d6d4870.trace.json</Key><ETag>&#34;9ac1f72884466b02e931f865eac6f472&#34;</ETag><Size>78882</Size><Owner><ID></ID></Owner><StorageClass>STANDARD</StorageClass><LastModified>2026-10-16T11:44:31Z</LastModified></Contents><Contents><Key>gh-pr-agent/023c9bfc3411a9fb92c85644b9aa23ef.trace.json</Key><ETag>&#34;cc389630650c1425f214965d115de33b&#34;</ETag><Size>104324</Size><Owner><ID></ID></Owner><StorageClass>STANDARD</StorageClass><LastModified>2026-10-23T08:31:26Z</LastModified></Contents><Contents><Key>gh-pr-agent/09addaca5955b9436479fba0c66a0f85.trace.json</Key><ETag>&#34;d0a77c0a11ee45fc07d5264966269de1&#34;</ETag><Size>244877</Size><Owner><ID></ID></Owner><StorageClass>STANDARD</StorageClass><LastModified>2026-10-15T08:51:08Z</LastModified></Contents><ContinuationToken></ContinuationToken><KeyCount>65</KeyCount></ListBucketResult>"
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["prefix", "total_listed", "sessions"], "properties": {"prefix": {"const": "gh-pr-agent/"}, "total_listed": {"const": 4}, "sessions": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "object", "required": ["key", "size", "last_modified"], "properties": {"key": {"type": "string", "pattern": "^gh-pr-agent/"}, "size": {"type": "integer"}}}}}}}
+  - name: "empty prefix"
+    args: {"prefix": "zzz-agent/"}
+    secrets: {"SESSIONS_ACCESS_KEY_ID": "stub", "SESSIONS_SECRET_ACCESS_KEY": "stub"}
+    http:
+      - method: GET
+        url: "https://t3.storage.dev/hiddenfield-tap-sessions?list-type=2&max-keys=1000&prefix=zzz-agent%2F"
+        status: 200
+        headers: {"content-type": "application/xml"}
+        body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><Name>hiddenfield-tap-sessions</Name><Prefix>zzz-agent/</Prefix><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated><ContinuationToken></ContinuationToken><KeyCount>0</KeyCount></ListBucketResult>"
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["sessions"], "properties": {"sessions": {"type": "array", "maxItems": 0}}}}
+  - name: "refuses its own prefix"
+    args: {"prefix": "session-analyser-agent"}
+    secrets: {"SESSIONS_ACCESS_KEY_ID": "stub", "SESSIONS_SECRET_ACCESS_KEY": "stub"}
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["error"], "properties": {"error": {"const": "self_session"}}}}
+  - name: "prefix with a path"
+    args: {"prefix": "gh-pr-agent/../x"}
+    secrets: {"SESSIONS_ACCESS_KEY_ID": "stub", "SESSIONS_SECRET_ACCESS_KEY": "stub"}
+    expect: {"ok": false, "error_kind": "invalid_args"}

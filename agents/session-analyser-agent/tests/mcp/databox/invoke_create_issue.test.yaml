@@ -1,0 +1,11 @@
+# Replies in the shape recorded from the live server with task agent:mcp-call; values are made up.
+tool: databox__invoke_create_issue
+cases:
+  - name: "files an issue (success reply hand-built from databox's result schema)"
+    args: {"args": {"team_id": "7a1f0c2e-1111-4a00-8000-000000000001", "project_id": "7a1f0c2e-2222-4a00-8000-000000000002", "title": "[session-analyser] gh-pr-agent/cost/get_file: 42 get_file calls to review a dependency bump", "description": "**What happened** ...", "priority": 3}}
+    mcp_response: {"content": [{"type": "text", "text": "{\"id\": \"7a1f0c2e-4444-4a00-8000-000000000004\", \"identifier\": \"ENG-43\", \"url\": \"https://linear.app/example/issue/ENG-43/session-analyser-gh-pr-agentcostget_file\"}"}], "structuredContent": {"id": "7a1f0c2e-4444-4a00-8000-000000000004", "identifier": "ENG-43", "url": "https://linear.app/example/issue/ENG-43/session-analyser-gh-pr-agentcostget_file"}}
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["id", "identifier", "url"]}}
+  - name: "missing title (error text as recorded)"
+    args: {"args": {}}
+    mcp_response: {"content": [{"type": "text", "text": "query failed: invalid create_issue params: missing field `title`"}], "isError": true}
+    expect: {"ok": false, "error_kind": "upstream"}

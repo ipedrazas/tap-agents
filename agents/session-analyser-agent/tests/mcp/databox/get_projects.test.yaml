@@ -1,0 +1,15 @@
+# Replies in the shape recorded from the live server with task agent:mcp-call; values are made up.
+tool: databox__get_projects
+cases:
+  - name: "by id"
+    args: {"id": "7a1f0c2e-2222-4a00-8000-000000000002"}
+    mcp_response: {"content": [{"type": "text", "text": "{\"created\": \"2026-06-01T09:00:00.000Z\", \"description\": \"Example project for fixtures.\", \"id\": \"7a1f0c2e-2222-4a00-8000-000000000002\", \"lead\": \"\", \"name\": \"Example Project\", \"progress\": 0.5, \"status\": \"started\", \"teams\": [\"ENG\"], \"updated\": \"2026-09-01T09:00:00.000Z\", \"url\": \"https://linear.app/example/project/example-project-0a1b2c3d4e5f\"}"}], "structuredContent": {"created": "2026-06-01T09:00:00.000Z", "description": "Example project for fixtures.", "id": "7a1f0c2e-2222-4a00-8000-000000000002", "lead": "", "name": "Example Project", "progress": 0.5, "status": "started", "teams": ["ENG"], "updated": "2026-09-01T09:00:00.000Z", "url": "https://linear.app/example/project/example-project-0a1b2c3d4e5f"}}
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["id", "name", "teams"], "properties": {"name": {"const": "Example Project"}}}}
+  - name: "unknown project"
+    args: {"id": "00000000-0000-4000-8000-000000000000"}
+    mcp_response: {"content": [{"type": "text", "text": "invalid request: Linear GraphQL error: Entity not found: Project (Could not find referenced Project.)"}], "isError": true}
+    expect: {"ok": false, "error_kind": "upstream"}
+  - name: "missing id"
+    args: {}
+    mcp_response: {"content": []}
+    expect: {"ok": false, "error_kind": "invalid_args"}
