@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: echo-agent
-  version: 0.1.4
+  version: 0.1.5
   owner: platform
   description: Reference agent that echoes text and reports the time; exercises the runner without secrets or egress
 
