@@ -1,0 +1,155 @@
+apiVersion: tavon.ai/agent/v1
+kind: Agent
+metadata:
+  name: session-analyser-agent
+  version: 0.1.0
+  owner: "platform"
+  description: "Analyses agent session traces from the sessions bucket and files evidence-backed improvement issues in Linear"
+
+harness:
+  api: v1
+  model:
+    provider: gateway
+    name: agent
+  # Summary first, then a few step windows per finding, then the issue calls.
+  maxTurns: 30
+
+# What the harness does before calling a write/irreversible tool: auto | deny | ask.
+# Write: the databox Linear tools create and update issues. Hook runs (the next
+# step) have no one to ask, so writes run without approval; the prompt files
+# issues only when asked to, and the databox token bounds where they can land.
+effectsPolicy:
+  write: auto
+  irreversible: deny
+
+prompt: system.md
+skills:
+  - skills/session-analyser
+
+runner:
+  image: registry.hiddenfield.dev/tap/runner-node@sha256:2a2fbd7db2656a2ede86a47fc671ebd44f811c8baca80ae6c2772bb990cbb556
+  timeout: 30s
+  resources: { cpu: 250m, memory: 256Mi }
+
+tools:
+  - name: list_sessions
+    description: "List session objects under one agent's prefix in the sessions bucket, newest first: key, size, last_modified. Use to find sessions when the person names an agent instead of a key."
+    input_schema:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: Sessions bucket
+          pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+          default: hiddenfield-tap-sessions
+        prefix:
+          type: string
+          description: "The analysed agent's prefix, e.g. gh-pr-agent"
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}/?$"
+        limit:
+          type: integer
+          description: How many of the newest sessions to return
+          minimum: 1
+          maximum: 50
+          default: 10
+      required: [prefix]
+      additionalProperties: false
+    exec: ["node", "tools/list_sessions.ts", "--bucket", "{{bucket}}", "--prefix", "{{prefix}}", "--limit", "{{limit}}"]
+    egress: [t3.storage.dev:443]
+    secrets: [SESSIONS_ACCESS_KEY_ID, SESSIONS_SECRET_ACCESS_KEY]
+    effects: read
+
+  - name: get_session_summary
+    description: "Digest of one session (tap trace or pi message log): agent and version, totals, per-tool calls/errors/latency, per-turn prompt and final answer, and signals (tool errors, repeated calls, heavy tool use, large results, unfinished turns). Call first."
+    input_schema:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: Sessions bucket
+          pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+          default: hiddenfield-tap-sessions
+        key:
+          type: string
+          description: "Object key, e.g. gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json"
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}[.]json$"
+      required: [key]
+      additionalProperties: false
+    exec: ["node", "tools/get_session_summary.ts", "--bucket", "{{bucket}}", "--key", "{{key}}"]
+    egress: [t3.storage.dev:443]
+    secrets: [SESSIONS_ACCESS_KEY_ID, SESSIONS_SECRET_ACCESS_KEY]
+    effects: read
+
+  - name: get_session_steps
+    description: "Read a window of one turn's steps: tool name, arguments, result, error flag; model text, stop reason, tokens. Fields clipped to max_chars. Use to check the evidence behind a signal before reporting it; continue with next_from."
+    input_schema:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: Sessions bucket
+          pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+          default: hiddenfield-tap-sessions
+        key:
+          type: string
+          description: Object key, as in get_session_summary
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}[.]json$"
+        turn:
+          type: integer
+          description: Turn index from the summary
+          minimum: 0
+          maximum: 10000
+        from:
+          type: integer
+          description: "Position of the first step within the turn (0-based; step t0.s7 is turn 0, position 7)"
+          minimum: 0
+          maximum: 100000
+          default: 0
+        count:
+          type: integer
+          description: How many steps to return
+          minimum: 1
+          maximum: 20
+          default: 8
+        max_chars:
+          type: integer
+          description: Clip each argument, result and text field to this many characters
+          minimum: 200
+          maximum: 4000
+          default: 1500
+      required: [key, turn]
+      additionalProperties: false
+    exec: ["node", "tools/get_session_steps.ts", "--bucket", "{{bucket}}", "--key", "{{key}}", "--turn", "{{turn}}", "--from", "{{from}}", "--count", "{{count}}", "--max_chars", "{{max_chars}}"]
+    egress: [t3.storage.dev:443]
+    secrets: [SESSIONS_ACCESS_KEY_ID, SESSIONS_SECRET_ACCESS_KEY]
+    effects: read
+
+mcp:
+  - name: databox
+    url: https://databox.tavon.io/mcp/76
+    transport: streamable-http
+    auth: { type: bearer, secret: DATABOX_TOKEN }
+    timeout: 60s
+    # Left out: invoke_create_project, invoke_update_project (the agent files
+    # into an existing project only), list_teams/get_teams and list_projects
+    # (the search tools cover them).
+    tools:
+      - { name: search_issues, effects: read }
+      - { name: list_issues, effects: read }
+      - { name: get_issues, effects: read }
+      - { name: search_teams, effects: read }
+      - { name: search_projects, effects: read }
+      - { name: get_projects, effects: read }
+      - { name: invoke_create_issue, effects: write }
+      - { name: invoke_update_issue, effects: write }
+
+secrets:
+  DATABOX_TOKEN:
+    from: vault://session-analyser-agent/databox-token
+  SESSIONS_ACCESS_KEY_ID:
+    from: vault://session-analyser-agent/sessions-access-key-id
+  SESSIONS_SECRET_ACCESS_KEY:
+    from: vault://session-analyser-agent/sessions-secret-access-key
+
+workspace:
+  size: 64Mi

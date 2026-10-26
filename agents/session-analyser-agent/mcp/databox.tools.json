@@ -1,0 +1,169 @@
+{
+  "get_issues": {
+    "description": "Get a single record from issues by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Record ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  "get_projects": {
+    "description": "Get a single record from projects by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Record ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  "invoke_create_issue": {
+    "description": "Create a new Linear issue. Low risk — internal project tracking, fully reversible.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "args": {
+          "type": "object",
+          "description": "Action arguments"
+        }
+      }
+    }
+  },
+  "invoke_update_issue": {
+    "description": "Update an existing Linear issue's fields. Low risk — changes are reversible.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "args": {
+          "type": "object",
+          "description": "Action arguments"
+        }
+      }
+    }
+  },
+  "list_issues": {
+    "description": "List records from issues",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Max records to return (default 20)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of records to skip (default 0)"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional filters as \"FIELD:OP:VALUE\" strings, AND-combined. OP is one of eq, ne, contains, ncontains, gt, lt, in, nin. For in/nin, VALUE is comma-separated."
+        }
+      }
+    }
+  },
+  "search_issues": {
+    "description": "Search records in issues",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max records to return (default 20)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of records to skip (default 0)"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional filters as \"FIELD:OP:VALUE\" strings, AND-combined. OP is one of eq, ne, contains, ncontains, gt, lt, in, nin. For in/nin, VALUE is comma-separated."
+        }
+      },
+      "required": [
+        "q"
+      ]
+    }
+  },
+  "search_projects": {
+    "description": "Search records in projects",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max records to return (default 20)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of records to skip (default 0)"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional filters as \"FIELD:OP:VALUE\" strings, AND-combined. OP is one of eq, ne, contains, ncontains, gt, lt, in, nin. For in/nin, VALUE is comma-separated."
+        }
+      },
+      "required": [
+        "q"
+      ]
+    }
+  },
+  "search_teams": {
+    "description": "Search records in teams",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max records to return (default 20)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of records to skip (default 0)"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional filters as \"FIELD:OP:VALUE\" strings, AND-combined. OP is one of eq, ne, contains, ncontains, gt, lt, in, nin. For in/nin, VALUE is comma-separated."
+        }
+      },
+      "required": [
+        "q"
+      ]
+    }
+  }
+}

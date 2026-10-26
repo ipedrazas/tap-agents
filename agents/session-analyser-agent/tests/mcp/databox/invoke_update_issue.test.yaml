@@ -1,0 +1,11 @@
+# Replies in the shape recorded from the live server with task agent:mcp-call; values are made up.
+tool: databox__invoke_update_issue
+cases:
+  - name: "adds an occurrence (success reply hand-built)"
+    args: {"args": {"issue_id": "ENG-43", "description": "**What happened** ...\n\n**Occurrences**\n- t3://hiddenfield-tap-sessions/gh-pr-agent/f8360853970eac6a32e20cd3abdd33bc.trace.json"}}
+    mcp_response: {"content": [{"type": "text", "text": "{\"success\": true}"}], "structuredContent": {"success": true}}
+    expect: {"ok": true, "output_schema": {"type": "object", "required": ["success"]}}
+  - name: "missing issue_id (error text as recorded)"
+    args: {"args": {}}
+    mcp_response: {"content": [{"type": "text", "text": "query failed: invalid update_issue params: missing field `issue_id`"}], "isError": true}
+    expect: {"ok": false, "error_kind": "upstream"}
