@@ -35,7 +35,7 @@ The full hunk-annotated patch of exactly one file (pages the list until the file
 
 ## get_file
 
-A numbered window of one file at a ref: `{"lines": [{"n", "text"}, ...], "total_lines": N, "window_start", "window_end"}`. At most 400 lines are returned; requesting `start_line`/`end_line` beyond the file clamps to the file. `ref` = head sha for new code, base sha for old. Errors: `directory`, `binary`, `not_found`. A `not_found` for a fork PR's head sha means the sha lives on the head repository — call again with the fork's owner/repo from `get_pull_request.head_repo_full_name`.
+A numbered window of one file at a ref: `{"lines": [{"n", "text"}, ...], "total_lines": N, "window_start", "window_end"}`. At most 400 lines are returned; requesting `start_line`/`end_line` beyond the file clamps to the file. `ref` = head sha for new code, base sha for old. Errors: `directory`, `binary`, `not_found`. A `not_found` for a fork PR's head sha means the sha lives on the head repository — call again with the fork's owner/repo from `get_pull_request.head_repo_full_name`. `owner` is the GitHub account or organisation (`ipedrazas`) and `repo` is the repository name (`tap`); they are not interchangeable, so never pass the owner as `repo`. When `head_repo_full_name` is null the PR is same-repo: use exactly the `owner`/`repo` from the PR URL, do not guess another repo, and do not switch `ref` to work around a `not_found`. A `not_found` whose message names the repo you asked for means the `repo` parameter is wrong, not the ref: read the error's suggestion and fix that.
 
 ## post_review_comment
 
