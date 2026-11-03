@@ -1,18 +1,23 @@
 # What a good deep-research report is. The harness verifies every answer
 # against this, outside the conversation that wrote it (docs/acceptance.md):
-# deterministic checks first, judged criteria only if they pass, and a human
-# sample. A failed answer goes back to the agent with the reasons, once.
+# deterministic checks first, then judged criteria (each once the checks it
+# uses pass), and a human sample. A failed answer goes back to the agent with
+# every reason, once.
+#
+# The checks decide only what a script can: the citations are well formed and
+# the links load. Which sentences are claims that need a source is a
+# judgement, so claims-supported makes it.
 apiVersion: tavon.ai/acceptance/v1
 kind: Acceptance
 maxAttempts: 2
 verifier:
-  # A different route from the agent's, so the judge isn't the author.
-  model: default
+  # A model kept for judging, not the agent's, so the judge isn't the author.
+  model: verifier
 criteria:
-  - id: claims-cited
-    description: Every factual statement cites a listed source, every citation is listed, and every listed source is cited.
+  - id: citations-wellformed
+    description: Every citation is listed in Sources, every listed source is cited, and every statement with a figure cites one.
     kind: deterministic
-    exec: ["node", "checks/claims_cited.ts"]
+    exec: ["node", "checks/citations_wellformed.ts"]
     timeout: 5s
 
   - id: links-resolve
@@ -22,10 +27,10 @@ criteria:
     timeout: 90s
     egress: ["*:443"]
 
-  - id: source-supports-claim
-    description: Each cited page actually says what the statement citing it claims.
+  - id: claims-supported
+    description: Every claim the report makes cites a page, and that page says what the claim says.
     kind: judged
-    rubricFile: acceptance/source-supports-claim.md
+    rubricFile: acceptance/claims-supported.md
     threshold: 0.8
     uses: [links-resolve]
 

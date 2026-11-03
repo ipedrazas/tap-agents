@@ -2,7 +2,7 @@
 
 `acceptance.yaml` says what a good answer from the agent looks like. It's optional. The harness verifies every answer against it, outside the agent's conversation:
 1. deterministic checks run first, in the runner;
-2. judged criteria run next, and only if every blocking check passed;
+2. judged criteria run next, each once the checks it `uses` have passed (a failure in a check it doesn't use doesn't stop it, so one attempt reports every problem);
 3. human criteria flag a sample of answers for review in the console.
 
 If a blocking criterion fails, the agent gets the reasons and answers again, up to `maxAttempts`; after that the answer is marked failed. The full reference is `docs/acceptance.md` in the tap repo; `agents/deep-research-agent` is the worked example.
@@ -17,6 +17,7 @@ People can't list their requirements up front, but they recognise a bad answer w
    - find the rule behind the reaction;
    - make it **deterministic** if it can be stated: a domain blocklist, at least N sources per section, a required section, a number in range;
    - make it **judged** only if it needs reading comprehension;
+   - watch for a rule that is a judgement in disguise (below);
    - add the output that prompted it as a failing fixture case.
 4. **Show each proposed criterion** (id, description, kind, and the script or rubric) and write it to the spec only after the user approves or edits it.
 
@@ -60,6 +61,14 @@ criteria:
     kind: human
     sampleRate: 0.2
 ```
+
+### A judgement in disguise
+
+Some rules sound syntactic but aren't. "Every claim is cited" turns into "every sentence has a citation" once a script enforces it, and a report is not only claims: lead-ins ("Two further points matter."), transitions and the report's own reasoning state nothing a source could back. A check that guesses from punctuation flags them, the agent gets told to fix a sentence that was fine, and each prompt tweak only moves the next false failure. deep-research-agent hit exactly this (0.1.3).
+
+Split such a rule along the line a script can draw:
+- **deterministic:** what the format decides (every `[n]` is listed, every source is cited) plus any high-precision signal (a sentence with a figure is always a claim);
+- **judged:** the rest (which sentences are claims, and whether each is supported), with the rubric saying what is *not* a claim.
 
 ## Deterministic checks
 

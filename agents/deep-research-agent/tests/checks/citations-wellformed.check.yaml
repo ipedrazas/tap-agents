@@ -1,4 +1,4 @@
-check: claims-cited
+check: citations-wellformed
 cases:
   - name: every statement cited, every source used
     task: How many people live in Paris?
@@ -47,7 +47,7 @@ cases:
       ## Sources
 
       1. Populations de référence 2023 − Commune de Paris (75056) — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
-    expect: { pass: true, reason: "^3 statements, all cited" }
+    expect: { pass: true, reason: "^1 source, all cited" }
   - name: a lead-in to a list needs no citation, its items do
     task: q
     output: |
@@ -63,7 +63,23 @@ cases:
       1. Populations légales 2010 — https://www.insee.fr/fr/statistiques/2128779?sommaire=2128804
       2. Populations de référence 2023 — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
     expect: { pass: true }
-  - name: a real sentence end after a number still splits
+  - name: a lead-in that ends in a full stop is not a figure (live report, 2026-11-03)
+    task: What is the population of the City of Paris according to the latest INSEE estimate, and how has it changed since 2010?
+    output: |
+      # Population of Paris
+
+      Paris had 2,103,778 inhabitants at 1 January 2023 [1].
+
+      There are also two definitional points to keep in mind.
+
+      - The figure is the municipal population, not the wider urban area [1].
+      - It counts people whose usual residence is in Paris [1].
+
+      ## Sources
+
+      1. Populations de référence 2023 − Commune de Paris (75056) — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+    expect: { pass: true }
+  - name: an uncited sentence without a figure is left to claims-supported
     task: q
     output: |
       # T
@@ -73,19 +89,54 @@ cases:
       ## Sources
 
       1. Paris — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
-    expect: { pass: false, reason: "^1 of 2 statements has no citation" }
-  - name: an uncited statement fails and is named
-    task: How many people live in Paris?
+    expect: { pass: true }
+  - name: an uncited figure fails and is named (live report, 2026-11-03)
+    task: What is the population of the City of Paris according to the latest INSEE estimate, and how has it changed since 2010?
     output: |
       # Population of Paris
 
-      The City of Paris had an estimated 2,102,650 residents in January 2023 [1].
-      It is the most densely populated city in Europe.
+      The most recent official INSEE population for the commune of Paris (code INSEE 75056) is **2,103,778 inhabitants**.
+
+      In 2010 Paris had 2,243,833 inhabitants [1].
 
       ## Sources
 
-      1. Paris - Wikipedia — https://en.wikipedia.org/wiki/Paris
-    expect: { pass: false, reason: "^1 of 2 statements has no citation" }
+      1. Populations légales 2010 — https://www.insee.fr/fr/statistiques/2128779?sommaire=2128804
+    expect: { pass: false, reason: "^1 statement with a figure has no citation" }
+  - name: a real sentence end after a number still splits
+    task: q
+    output: |
+      # T
+
+      Paris had 2,103,778 inhabitants in 2023 [1]. In 2010 it had 2,243,833.
+
+      ## Sources
+
+      1. Paris — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+    expect: { pass: false, reason: "^1 statement with a figure has no citation" }
+  - name: a listed source that is never cited fails
+    task: q
+    output: |
+      # T
+
+      Paris is the capital of France [1].
+
+      ## Sources
+
+      1. Paris — https://en.wikipedia.org/wiki/Paris
+      2. France — https://en.wikipedia.org/wiki/France
+    expect: { pass: false, reason: "Sources lists 2 but the report never cites it" }
+  - name: a report that cites nothing fails
+    task: q
+    output: |
+      # T
+
+      Paris is the capital of France.
+
+      ## Sources
+
+      1. Paris — https://en.wikipedia.org/wiki/Paris
+    expect: { pass: false, reason: "cites none of its sources" }
   - name: a citation missing from Sources fails
     task: q
     output: |
