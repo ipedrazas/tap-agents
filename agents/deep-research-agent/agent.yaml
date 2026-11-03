@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: deep-research-agent
-  version: 0.1.0
+  version: 0.1.1
   owner: platform
   description: Researches a question on the web and writes a cited report, in which every factual sentence cites a page that says it. Its answers are verified against acceptance.yaml.
 
