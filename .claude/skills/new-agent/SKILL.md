@@ -1,6 +1,6 @@
 ---
 name: new-agent
-description: Create a new tap agent bundle (agent.yaml, system prompt, skills, tool scripts, fixtures) from a short spec, validate it, and test it in its real runner image. Use when asked to create, generate or scaffold an agent for the tap platform, or to add tools to an existing one.
+description: Create a new tap agent bundle (agent.yaml, system prompt, skills, tool scripts, fixtures, acceptance criteria) from a short spec, validate it, and test it in its real runner image. Use when asked to create, generate or scaffold an agent for the tap platform, or to add tools to an existing one.
 ---
 
 # Create a tap agent
@@ -9,7 +9,7 @@ You turn a short spec ("an agent that answers X using API Y") into a bundle unde
 
 This repository (`tap-agents`) holds the agents; the platform is [ipedrazas/tap](https://github.com/ipedrazas/tap). `tap.version` pins a tap release, and `task fetch` (run by every task that needs it) puts its `tapctl`, `tap-runner` and `platform.yaml` in `.tap/`. Tasks that touch the cluster, the registry or OpenBao (`agent:test`, `agent:deploy`, `agent:launch`, `secrets:put`) run in a tap checkout (`TAP_DIR`, default `../tap`); this repo's Taskfile forwards them.
 
-Read `reference/spec.md` before writing `agent.yaml`, `reference/tools.md` before writing tool code, and `reference/mcp.md` before declaring an MCP server. They're short, and every rule in them is enforced.
+Read `reference/spec.md` before writing `agent.yaml`, `reference/tools.md` before writing tool code, `reference/mcp.md` before declaring an MCP server, and `reference/acceptance.md` before writing `acceptance.yaml`. They're short, and every rule in them is enforced.
 
 ## Workflow
 
@@ -24,6 +24,7 @@ Before any file, write down the agent's contract. Specs are written for people a
 - **MCP servers**: if the spec names a remote MCP server (or a service offers one and that's simpler than writing tools), use it. Read `reference/mcp.md`.
 - **Where results go**: the chat, unless the spec asks the agent to post or send something (that's `write`, and needs an explicit yes).
 - **Two example exchanges**: what someone asks, which tools run, what the answer contains. A tool no example uses is probably not needed.
+- **What a good answer looks like**: from the examples, what every answer must have (a format, sources, a section). This seeds the acceptance spec; the user refines it later by reacting to real outputs, so don't ask them to list requirements now.
 
 Ask the user about every gap you can't settle from the spec or the API: where an input comes from, a required API key's name, an ambiguous effect level, where results go. Don't fill a gap by inventing a tool around input nobody can provide.
 
@@ -57,6 +58,15 @@ For each MCP server: declare it in `agent.yaml`, run `task agent:mcp-snapshot AG
 
 Then write `system.md` (role, when to use which tool, how to answer) and the skill's `SKILL.md` (what each output field means). Keep the system prompt short and concrete.
 
+### 3b. Draft the acceptance spec
+
+Write `acceptance.yaml` with a few criteria drawn from the brief's "what a good answer looks like" (see `reference/acceptance.md`):
+- prefer deterministic checks (`checks/`, each with passing and failing fixtures in `tests/checks/<id>.check.yaml`);
+- use judged rubrics only for what needs reading;
+- if the system prompt asks for an output format, a check for that format is the first criterion.
+
+Then improve it from the user's reactions: ask for two or three real inputs, show the outputs, turn each critique into one proposed criterion, and write it only once they approve it. Never ask the user to define validation criteria from scratch. If the agent acts (`write` or `irreversible` tools under `effectsPolicy: auto`), explain that verification runs after the action, and help them choose a criterion that checks the effect (`reference/acceptance.md`, "Agents that act"). Note it in your report.
+
 ### 4. Validate, then test
 
 ```bash
@@ -75,7 +85,8 @@ Run `task agent:diff AGENT=<name>`. For a new agent this exits 3 and lists every
 
 - what the agent does and its tools (one line each);
 - the permission summary: hosts per tool, secrets, effect levels, and `effectsPolicy`;
-- the fixture results, and which recordings are hand-built rather than real;
+- the fixture results (tools and checks), and which recordings are hand-built rather than real;
+- the acceptance criteria (id, kind, blocking), which came from the user's reactions, and any `tapctl validate` notes;
 - for any secrets: "store each one in OpenBao before deploying: `pbpaste | task secrets:put AGENT=<name> NAME=<NAME>`" (never ask for or handle the values yourself);
 - **Decisions for the user**: every assumption or spec deviation, or "none".
 
@@ -85,4 +96,4 @@ Deploying is merging the PR. The publish workflow builds, tests and signs the bu
 
 ## Changing an existing agent
 
-Bump `metadata.version` for every change to `agent.yaml` (semver: patch for fixes, minor for new tools). Pushes of an existing version with different content are refused. Run `task agent:diff AGENT=<name>`: exit 3 means the change widens permissions, so call out exactly what widened; exit 4 means files other than `agent.yaml` changed, so summarise the code change; exit 1 means the version wasn't bumped.
+Bump `metadata.version` for every change to the bundle, `acceptance.yaml` and checks included (semver: patch for fixes, minor for new tools or criteria). A criterion added from a review note gets a failing fixture made from the answer that prompted it. Pushes of an existing version with different content are refused. Run `task agent:diff AGENT=<name>`: exit 3 means the change widens permissions, so call out exactly what widened; exit 4 means files other than `agent.yaml` changed, so summarise the code change; exit 1 means the version wasn't bumped.
