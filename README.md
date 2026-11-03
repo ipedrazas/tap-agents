@@ -11,7 +11,7 @@ task agent:test:local AGENT=demo-agent    # host interpreters (real paths, not m
 task agent:diff AGENT=demo-agent          # exit 3: permissions widened, needs review; 4: code changed
 ```
 
-The first task downloads the pinned release into `.tap/` (`./fetch-tap.sh`, needs `gh`). `task tapctl:install` puts that release's `tapctl` on your PATH. After bumping `tap.version` to a release with new runner digests, `task runner:bump` points every agent at them; then bump each agent's `metadata.version`. Writing agents: `.claude/skills/new-agent/SKILL.md`. Each agent that the factory is evaluated against has its spec in `agents/<name>/eval.md`; `eval.md` isn't part of the bundle.
+The first task downloads the pinned release into `.tap/` (`./fetch-tap.sh`, needs `gh`). `task tapctl:install` puts that release's `tapctl` on your PATH. After bumping `tap.version` to a release with new runner digests, `task runner:bump` points every agent at them; then bump each agent's `metadata.version`. Writing agents: `.claude/skills/new-agent/SKILL.md`. An agent may carry an `acceptance.yaml`, criteria every answer is verified against (deterministic checks, judged rubrics, human sampling), with `deep-research-agent` as the example; see `reference/acceptance.md` in the skill and tap's `docs/acceptance.md`. Each agent that the factory is evaluated against has its spec in `agents/<name>/eval.md`; `eval.md` isn't part of the bundle.
 
 Merging to main deploys:
 1. `.github/workflows/publish.yml` builds, pushes and signs the bundles whose sources changed (bump `metadata.version`).

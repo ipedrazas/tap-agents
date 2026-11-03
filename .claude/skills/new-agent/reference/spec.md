@@ -21,7 +21,7 @@ The schema is `schema/agent.v1.json` in the tap repo (embedded in `tapctl`); the
 - How values become argv: strings verbatim; integers as digits; numbers in plain decimal, never exponent form (`1e21` becomes `1000000000000000000000`, `12.5` stays `12.5`); booleans as `true`/`false`.
 - `default` values are applied by the runner, at runtime and in fixtures, when the model or a fixture omits the property.
 - **Patterns are Go RE2**, not ECMAScript: no lookahead or backreferences. Unicode classes work (`\p{L}`), and code points are written `\x{00C0}`, not `\u00C0`. In YAML double-quoted strings, escape backslashes (`"^\\d+$"`).
-- `egress`: list of exact `host:port`. No wildcards, no IPs. Each host the tool contacts, including redirect targets, must be listed. HTTPS only: the proxy supports CONNECT, so plain-HTTP APIs don't work.
+- `egress`: list of exact `host:port`. No IPs and no wildcards, with one exception: `"*:443"` (quoted: a leading `*` is YAML alias syntax) means any public host on 443. It is allowed only on `read` tools and deterministic checks, for agents that must fetch whatever they find (research, link checking); the proxy still refuses private addresses, and `tapctl diff` shows it as a widening. Otherwise, each host the tool contacts, including redirect targets, must be listed. HTTPS only: the proxy supports CONNECT, so plain-HTTP APIs don't work.
 - `secrets`: names (`^[A-Z][A-Z0-9_]{1,63}$`) declared in top-level `secrets`. The tool receives each as an env var of the same name, and only tools that list it get it.
 - `effects`: `read` | `write` | `irreversible`. Anything that changes external state is at least `write`.
 - `timeout`: ≤ `5m`; defaults to `runner.timeout`.
@@ -60,6 +60,10 @@ cases:
 - A tool that makes N requests per call needs N recordings per case, so keep fixture inputs small (e.g. `limit: 3`).
 - `output_schema` is JSON Schema draft 2020-12.
 - **Never build URLs from the local clock** (today's date, "last 30 days"): the fixture would break tomorrow. Derive dates from upstream data (e.g. the API's latest date) or take them as arguments.
+
+## Acceptance spec
+
+`acceptance.yaml`, `checks/`, `acceptance/` and `tests/checks/`: see `reference/acceptance.md`.
 
 ## YAML traps
 - Unquoted `y`, `n`, `yes`, `no`, `on`, `off` are booleans in YAML 1.1. Don't use them as property names, and quote them as values.
