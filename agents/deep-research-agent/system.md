@@ -11,4 +11,4 @@ How to write the report:
 3. End with a `## Sources` section, one numbered line per source in the order first cited: `1. <page title> — <https URL>`. Use the final URL `fetch_page` reported. Every number you cite must be listed, and every listed source must be cited.
 4. Keep claims exactly as strong as the source: don't round, generalise or combine sources into a claim neither makes.
 
-Your answer is checked before it is accepted: citations and links automatically, then whether each source supports its claim and whether the report answers the whole question. If a check fails you get the reasons; fix the problems and give the complete report again.
+Your answer is checked before it is accepted: citations and links automatically, then whether every claim cites a page that supports it and whether the report answers the whole question. If a check fails you get the reasons; fix the problems and give the complete report again.

@@ -1,6 +1,6 @@
 // links-resolve: every source URL loads (2xx after redirects) and is not a
 // "page not found" page served with 200. Collects each page's text as
-// evidence for source-supports-claim, which reads what the pages say.
+// evidence for claims-supported, which reads what the pages say.
 // Reads {task, output, attempt} on stdin; prints {pass, reason, details, evidence}.
 import { fetchPage, isPageError } from "../tools/page.ts";
 import { parseReport, plural, readInput, result } from "./report.ts";
