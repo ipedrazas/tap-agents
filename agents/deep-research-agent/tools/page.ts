@@ -24,25 +24,58 @@ const NOT_FOUND =
   /\b(404|page not found|not found|page (?:does not|doesn't|cannot be found|can't be found|no longer exists)|no longer available|page unavailable|nothing (?:was )?found|this page isn't available|content (?:is )?not available)\b/i;
 const NOT_FOUND_PATH = /\/(?:404|not[-_]?found|page[-_]?not[-_]?found|error)(?:[/.?#]|$)/i;
 
+const ENTITIES: Record<string, string> = {
+  nbsp: " ", lt: "<", gt: ">", quot: '"', apos: "'", minus: "−", ndash: "–", mdash: "—", hellip: "…",
+  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", euro: "€", pound: "£", deg: "°",
+  times: "×", middot: "·", copy: "©", reg: "®", trade: "™", eacute: "é", egrave: "è", agrave: "à", ccedil: "ç",
+};
+
+// decode replaces character references; &amp; last, so "&amp;lt;" stays "&lt;".
 export function decode(s: string): string {
   return s
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-z]+);/gi, (m, name) => (name.toLowerCase() === "amp" ? m : (ENTITIES[name] ?? ENTITIES[name.toLowerCase()] ?? m)))
+    .replace(/&amp;/gi, "&");
+}
+
+const stripTags = (s: string) => decode(s.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+
+// tableToText keeps a table's structure, which flattening would lose: with a
+// header row, each data row becomes "Header: value; Header: value", so every
+// figure stays next to its label; otherwise each row is "cell | cell".
+export function tableToText(table: string): string {
+  const caption = stripTags(/<caption[^>]*>([\s\S]*?)<\/caption>/i.exec(table)?.[1] ?? "");
+  const rows = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) =>
+    [...r[1]!.matchAll(/<(t[hd])[^>]*>([\s\S]*?)<\/\1>/gi)].map((c) => ({ head: c[1]!.toLowerCase() === "th", text: stripTags(c[2]!) })),
+  );
+  const lines: string[] = caption ? [caption] : [];
+  const header = rows[0]?.every((c) => c.head) ? rows[0]!.map((c) => c.text) : null;
+  for (const row of header ? rows.slice(1) : rows) {
+    if (row.length === 0) continue;
+    if (header && row.length === header.length) {
+      lines.push(row.map((c, i) => `${header[i]}: ${c.text}`).join("; "));
+    } else if (header && row.length === header.length + 1 && row[0]!.head) {
+      // A row header first ("2023 | ..."), then one cell per column.
+      lines.push(`${row[0]!.text}: ` + row.slice(1).map((c, i) => `${header[i]}: ${c.text}`).join("; "));
+    } else {
+      lines.push(row.map((c) => c.text).join(" | "));
+    }
+  }
+  if (header && rows.length === 1) lines.push(header.join(" | "));
+  return lines.join("\n");
 }
 
 export function htmlToText(html: string): { title: string; h1: string; text: string } {
-  const title = decode((/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "").replace(/\s+/g, " ").trim());
-  const h1 = decode((/<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim());
+  const title = stripTags(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "");
+  const h1 = stripTags(/<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1] ?? "");
   const body = html
     .replace(/<(script|style|noscript|svg|template|nav|footer|header)[^>]*>[\s\S]*?<\/\1>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\/(p|div|li|h[1-6]|tr|br|section|article)>/gi, "\n")
+    // The source's own line breaks mean nothing in HTML; only block ends do.
+    .replace(/\s+/g, " ")
+    .replace(/<table[^>]*>[\s\S]*?<\/table>/gi, (t) => `\n${tableToText(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")}\n`)
+    .replace(/<\/(p|div|li|h[1-6]|tr|section|article|caption|dt|dd|blockquote|pre)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
   const text = decode(body)
