@@ -61,9 +61,34 @@ export function parseReport(text: string): Report {
   return { body, sources, hasSources: Boolean(m), claims: claims(body) };
 }
 
+// Words that end in a full stop without ending the sentence: "decree no. 2025-1362",
+// "e.g. Lyon", "et al. 2021", "U.S. Census". Single letters (initials) count too.
+const ABBREVIATIONS = new Set([
+  "no", "nos", "nr", "num", "e.g", "i.e", "etc", "vs", "cf", "approx", "ca", "c", "art", "arts", "sec", "ch", "p", "pp", "para",
+  "fig", "figs", "tab", "vol", "vols", "ed", "eds", "rev", "al", "op", "dr", "mr", "mrs", "ms", "prof", "st", "jr", "sr",
+  "inc", "ltd", "co", "corp", "dept", "est", "u.s", "u.k", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept",
+  "oct", "nov", "dec", "mt", "ft", "km", "min", "max", "avg",
+]);
+
+// sentences splits a paragraph at ".", "!" or "?" followed by a space and
+// a capital, digit or opening quote, except after an abbreviation.
+export function sentences(p: string): string[] {
+  const out: string[] = [];
+  const end = /[.!?](?=\s+["“'(\[]?[\p{Lu}0-9])/gu;
+  let start = 0;
+  for (let m = end.exec(p); m; m = end.exec(p)) {
+    const word = (/([\p{L}.]+)$/u.exec(p.slice(start, m.index))?.[1] ?? "").toLowerCase();
+    if (m[0] === "." && (ABBREVIATIONS.has(word) || /^\p{L}$/u.test(word))) continue;
+    out.push(p.slice(start, m.index + 1));
+    start = m.index + 1;
+  }
+  out.push(p.slice(start));
+  return out;
+}
+
 // claims splits the body into the sentences that must carry a citation:
 // every sentence of prose and every list item, but not headings, code,
-// tables, questions, fragments of fewer than four words, or "> Note:" lines,
+// tables, questions, lead-ins ending in ":", fragments of fewer than four words, or "> Note:" lines,
 // where the agent says what it could not find (system.md).
 export function claims(body: string): Claim[] {
   const out: Claim[] = [];
@@ -98,9 +123,10 @@ export function claims(body: string): Claim[] {
     // Markdown links read as their text; citations after the full stop
     // belong to the sentence before it.
     const norm = p.replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, "$1").replace(/([.!?])((?:\s*\[\d+\])+)/g, "$2$1");
-    for (const s of norm.split(/(?<=[.!?])\s+(?=[A-Z0-9"“'(])/)) {
+    for (const s of sentences(norm)) {
       const text = s.trim();
-      if (text.split(/\s+/).length < 4 || text.endsWith("?")) continue;
+      // Questions, fragments, and lead-ins to a list ("Comparing the two:") make no claim.
+      if (text.split(/\s+/).length < 4 || text.endsWith("?") || text.endsWith(":")) continue;
       const cites = [...text.matchAll(CITE)].map((c) => Number(c[1]));
       out.push({ text, cites });
     }

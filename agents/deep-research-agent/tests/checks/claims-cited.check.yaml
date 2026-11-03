@@ -37,6 +37,43 @@ cases:
 
       1. Paris — https://en.wikipedia.org/wiki/Paris
     expect: { pass: true }
+  - name: an abbreviation is not the end of a sentence (live report, 2026-11-03)
+    task: What is the population of the City of Paris according to the latest INSEE estimate?
+    output: |
+      # Population of Paris
+
+      The 2023 vintage was published on 29 December 2025 and entered into force on 1 January 2026, authenticated by decree no. 2025-1362 of 26 December 2025 [1]. It is the latest entry in the published series of reference populations, e.g. Paris and Lyon, as in Dupont et al. 2024 [1]. The U.S. Census Bureau publishes similar figures for American cities [1].
+
+      ## Sources
+
+      1. Populations de référence 2023 − Commune de Paris (75056) — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+    expect: { pass: true, reason: "^3 statements, all cited" }
+  - name: a lead-in to a list needs no citation, its items do
+    task: q
+    output: |
+      # T
+
+      Comparing the two reference populations:
+
+      - Paris had 2,243,833 inhabitants at 1 January 2010 [1].
+      - Paris had 2,103,778 inhabitants at 1 January 2023 [2].
+
+      ## Sources
+
+      1. Populations légales 2010 — https://www.insee.fr/fr/statistiques/2128779?sommaire=2128804
+      2. Populations de référence 2023 — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+    expect: { pass: true }
+  - name: a real sentence end after a number still splits
+    task: q
+    output: |
+      # T
+
+      Paris had 2,103,778 inhabitants in 2023 [1]. The decline is driven by migration, not by deaths exceeding births.
+
+      ## Sources
+
+      1. Paris — https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+    expect: { pass: false, reason: "^1 of 2 statements has no citation" }
   - name: an uncited statement fails and is named
     task: How many people live in Paris?
     output: |
