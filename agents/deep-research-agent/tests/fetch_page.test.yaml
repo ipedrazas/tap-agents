@@ -1,0 +1,50 @@
+tool: fetch_page
+cases:
+  - name: page text without scripts and navigation
+    args: { url: "https://en.wikipedia.org/wiki/Paris" }
+    http:
+      - method: GET
+        url: https://en.wikipedia.org/wiki/Paris
+        status: 200
+        headers: { content-type: text/html; charset=utf-8 }
+        body: "<html><head><title>Paris - Wikipedia</title><script>track()</script></head><body><nav>Main menu</nav><h1>Paris</h1><p>Paris is the capital and largest city of France. The City of Paris has an estimated population of 2,102,650 residents as of January 2023.</p><p>The Seine flows through the city.</p></body></html>"
+    expect:
+      ok: true
+      output_schema:
+        type: object
+        required: [status, title, text, soft_404]
+        properties:
+          status: { const: 200 }
+          title: { const: "Paris - Wikipedia" }
+          soft_404: { const: false }
+          text: { type: string, pattern: "2,102,650 residents", not: { pattern: "track\\(\\)|Main menu" } }
+  - name: a not-found page served with 200 is a soft 404
+    args: { url: "https://example.org/stats/2023" }
+    http:
+      - method: GET
+        url: https://example.org/stats/2023
+        status: 200
+        headers: { content-type: text/html }
+        body: "<html><head><title>Page Not Found | Example</title></head><body><h1>Sorry, we couldn't find that page</h1><p>Try searching instead.</p></body></html>"
+    expect:
+      ok: true
+      output_schema: { type: object, required: [soft_404], properties: { soft_404: { const: true }, soft_404_reason: { type: string, pattern: "title" } } }
+  - name: table cells keep their headers, entities are decoded (INSEE, 2026-11-03)
+    args: { url: "https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056" }
+    http:
+      - method: GET
+        url: https://www.insee.fr/fr/statistiques/8643952?geo=COM-75056
+        status: 200
+        headers: { content-type: text/html; charset=utf-8 }
+        body: "<html><head><title>Populations de référence 2023 &minus; Commune de Paris | Insee</title></head><body><h1>Populations de référence 2023</h1><p>Commune de Paris (75056). Ces données sont disponibles sur toutes les communes de France hors Mayotte.</p>\n<table id=\"produit-tableau-popref_T1\">\n <caption>POPREF T1 - Populations de référence au 1er janvier 2023</caption>\n <thead>\n <tr>\n <th scope=\"col\">Population municipale</th>\n <th scope=\"col\">Population comptée à part</th>\n <th scope=\"col\">Population totale</th>\n </tr>\n </thead>\n <tbody>\n <tr>\n <td class=\"nombre\">2&nbsp;103&nbsp;778</td>\n <td class=\"nombre\">15&nbsp;634</td>\n <td class=\"nombre\">2&nbsp;119&nbsp;412</td>\n </tr>\n </tbody>\n</table>\n<p>Sources : Insee, RP2023.</p></body></html>"
+    expect:
+      ok: true
+      output_schema:
+        type: object
+        required: [title, text]
+        properties:
+          title: { const: "Populations de référence 2023 − Commune de Paris | Insee" }
+          text: { type: string, pattern: "Population municipale: 2 103 778; Population comptée à part: 15 634; Population totale: 2 119 412" }
+  - name: rejects plain http
+    args: { url: "http://example.org/" }
+    expect: { ok: false, error_kind: invalid_args }

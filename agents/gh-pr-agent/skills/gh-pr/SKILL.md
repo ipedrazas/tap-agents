@@ -37,6 +37,7 @@ The full hunk-annotated patch of exactly one file (pages the list until the file
 
 A numbered window of one file at a ref (use it as a targeted reader, not a file dump: pass `start_line`/`end_line` for a narrow ~20-60 line window around the code you need, and only for paths taken from the diff or from a file you already read, never guessed): `{"lines": [{"n", "text"}, ...], "total_lines": N, "window_start", "window_end"}`. At most 400 lines are returned (never ask for that much; each line stays in context for the rest of the review); requesting `start_line`/`end_line` beyond the file clamps to the file. `ref` = head sha for new code, base sha for old. Errors: `directory`, `binary`, `not_found`. A `not_found` for a fork PR's head sha means the sha lives on the head repository — call again with the fork's owner/repo from `get_pull_request.head_repo_full_name`.
 
+
 ## post_review_comment
 
 One request that adds a comment to the PR conversation. `body` is the review in GitHub markdown, in the answer format; it must start with the verdict line (not `-` or whitespace) and be at most 30000 characters. The tool appends a footer marking the comment as automated. Output: `{"posted": true, "id", "url"}`. Errors: `forbidden` (the token cannot write to this repository), `unauthorized` (no token), `not_found`, `upstream` with `status: 422` (locked conversation or invalid body), `empty_body`. Call it once per review, only when asked to post.

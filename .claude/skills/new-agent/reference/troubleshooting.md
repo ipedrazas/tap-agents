@@ -24,6 +24,13 @@
 | `Transit key … is not platform.yaml's signing key` / `no OpenBao token` / `OpenBao rejected the operator token` | signing keys rotated, or the operator token is missing or expired | ask the user (`task openbao:onboard`, `task signing:pin`, in the tap repo); never create or replace keys or tokens yourself |
 | admission: `the bundle has no passing fixture run signed by the pipeline` | deployed a bundle that never passed `agent:test` | run `task agent:test`, then deploy |
 | admission: `is not a registry.hiddenfield.dev/tap/ image pinned by digest` | a hand-edited image or a tag | use the curated digests from `platform.yaml` (`tapctl runner bump`) |
+| `rule 13 ... needs fixtures in tests/checks/<id>.check.yaml with at least one passing and one failing case` | a deterministic check without both kinds of fixture | add a case that should pass and one that should fail |
+| `rule 13 ... checks read their input from stdin` | `{{...}}` in a check's `exec` | drop it; read `{task, output}` from stdin |
+| `rule 1 ... must be a script under checks/` | check script elsewhere | move it to `checks/`; shared code can stay in `tools/` |
+| `rule 4 ... *:443 is only allowed on read tools and deterministic checks` | `*:443` on a write tool | list the hosts it writes to |
+| `acceptance.yaml: jsonschema validation failed` | wrong fields for the kind (e.g. `threshold` on a deterministic check, `exec` on a judged one) | each kind takes only its own fields; see `reference/acceptance.md` |
+| check `errored: bad_output: check output needs a boolean "pass"` | the check printed something else, or nothing | print exactly one `{"pass": ..., "reason": ...}`; write it synchronously (`writeSync`) |
+| `note: acceptance.yaml: ... run without approval during the turn` | auto write/irreversible tools in an agent with an acceptance spec | not an error; explain it to the user and check the effect (`reference/acceptance.md`, "Agents that act") |
 | `rule 3 ... must be vault://<agent>/<key>` | the secret points outside the agent's own path | use `vault://<agent-name>/<key>` |
 | deploy: `secrets not synced from OpenBao` | the value was never stored | ask the user to run `task secrets:put AGENT=<name> NAME=<NAME>`; never handle secret values yourself |
 | `tapctl: ... dial tcp 192.168.2.225:443: i/o timeout` on a Mac | macOS Local Network permission for a freshly built `tapctl` | ask the user to allow the prompt, then retry |
