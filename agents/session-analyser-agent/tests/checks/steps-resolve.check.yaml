@@ -1,0 +1,87 @@
+check: steps-resolve
+cases:
+  - name: cited steps exist and become evidence
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse gh-pr-agent/abc.trace.json
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[error-handling] retried the same not_found** t0.s1 and t0.s3 call get_file with the same arguments.
+      Not filed: not asked to.
+    http: &trace
+      - method: GET
+        url: "https://t3.storage.dev/hiddenfield-tap-sessions/gh-pr-agent/abc.trace.json"
+        status: 200
+        headers: { content-type: application/json }
+        body:
+          trace_version: 1
+          session_id: abc
+          agent_name: gh-pr-agent
+          agent_version: 0.3.6
+          turns:
+            - turn_index: 0
+              trigger: hook
+              prompt: Review https://github.com/acme/app/pull/7 and post
+              steps:
+                - { step_index: 0, kind: llm_call, llm_call: { stop_reason: tool_calls, text: "", tool_call_ids: [c1] } }
+                - { step_index: 1, step_id: c1, kind: tool_call, tool_call: { name: get_file, arguments: { path: a.ts }, status: ok, result: '{"error":"not_found"}' } }
+                - { step_index: 2, kind: llm_call, llm_call: { stop_reason: tool_calls, text: "", tool_call_ids: [c2] } }
+                - { step_index: 3, step_id: c2, kind: tool_call, tool_call: { name: get_file, arguments: { path: a.ts }, status: ok, result: '{"error":"not_found"}' } }
+                - { step_index: 4, kind: llm_call, llm_call: { stop_reason: stop, text: "Blocking issues found" } }
+    expect: { pass: true, reason: "all 2 cited steps found in gh-pr-agent/abc.trace.json" }
+  - name: the bucket comes from a t3:// key
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse t3://other-bucket/gh-pr-agent/abc.trace.json
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: Nothing worth filing. The error at t0.s1 was handled.
+    http:
+      - method: GET
+        url: "https://t3.storage.dev/other-bucket/gh-pr-agent/abc.trace.json"
+        status: 200
+        headers: { content-type: application/json }
+        body: { trace_version: 1, session_id: abc, agent_name: gh-pr-agent, turns: [ { turn_index: 0, trigger: hook, prompt: p, steps: [ { step_index: 0, kind: llm_call, llm_call: { stop_reason: tool_calls, tool_call_ids: [c1] } }, { step_index: 1, step_id: c1, kind: tool_call, tool_call: { name: get_file, arguments: {}, status: error, result: "Error" } } ] } ] }
+    expect: { pass: true }
+  - name: a step that is not in the session fails
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse gh-pr-agent/abc.trace.json
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[cost] the diff was fetched twice** t0.s1 and t0.s9. Not filed: not asked to.
+    http: *trace
+    expect: { pass: false, reason: "1 cited step is not in gh-pr-agent/abc.trace.json: t0.s9 \\(turn 0 has 5 steps\\)" }
+  - name: a turn that is not in the session fails
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse gh-pr-agent/abc.trace.json
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[cost] x** t2.s0. Not filed: not asked to.
+    http: *trace
+    expect: { pass: false, reason: "t2.s0 \\(no turn 2; the session has 1\\)" }
+  - name: a session that can't be read fails with the reason
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse gh-pr-agent/gone.trace.json
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[cost] x** t0.s1. Not filed: not asked to.
+    http:
+      - method: GET
+        url: "https://t3.storage.dev/hiddenfield-tap-sessions/gh-pr-agent/gone.trace.json"
+        status: 404
+        body: "<Error><Code>NoSuchKey</Code></Error>"
+    expect: { pass: false, reason: "could not read gh-pr-agent/gone.trace.json.*not_found" }
+  - name: no step ids, nothing to resolve
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse gh-pr-agent/abc.trace.json
+    output: "The session gh-pr-agent/abc.trace.json was not found (not_found). Check the key with list_sessions."
+    expect: { pass: true, reason: "cites no step ids" }
+  - name: step ids without a session key are not checked
+    secrets: { SESSIONS_ACCESS_KEY_ID: stub, SESSIONS_SECRET_ACCESS_KEY: stub }
+    task: Analyse the latest gh-pr-agent session
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[cost] x** t0.s1. Not filed: not asked to.
+    expect: { pass: true, reason: "no session key" }

@@ -1,0 +1,55 @@
+# What a good session analysis is. The harness verifies every answer against
+# this, outside the conversation that wrote it (tap's docs/acceptance.md):
+# deterministic checks first, then judged criteria (each once the checks it
+# uses pass), and a human sample.
+#
+# The agent acts: with write: auto it files Linear issues during the turn, so
+# a retry runs after the issues exist. Filing is idempotent by fingerprint (a
+# match whose Occurrences already list this session is left alone), so a
+# second attempt updates or skips rather than duplicates; that is why
+# maxAttempts is 2 and not 1. These criteria judge the answer; they don't read
+# Linear to check what was actually filed.
+apiVersion: tavon.ai/acceptance/v1
+kind: Acceptance
+maxAttempts: 2
+verifier:
+  # A model kept for judging, not the agent's, so the judge isn't the author.
+  model: verifier
+criteria:
+  - id: report-format
+    description: The first line's verdict matches the findings listed; each is "**[kind] title**" with a known kind and step ids; at most five per session; an answer with findings says what was filed.
+    kind: deterministic
+    exec: ["node", "checks/report_format.ts"]
+    timeout: 5s
+
+  - id: no-secrets
+    description: The answer copies no token, key or email address out of the session.
+    kind: deterministic
+    exec: ["node", "checks/no_secrets.ts"]
+    timeout: 5s
+
+  - id: steps-resolve
+    description: Every cited step id is a step of the analysed session; the cited steps become evidence for the judge.
+    kind: deterministic
+    exec: ["node", "checks/steps_resolve.ts"]
+    timeout: 30s
+    egress: [t3.storage.dev:443]
+    secrets: [SESSIONS_ACCESS_KEY_ID, SESSIONS_SECRET_ACCESS_KEY]
+
+  - id: findings-supported
+    description: Each finding is shown by the steps it cites, is a fixable problem of the analysed agent, and recommends a concrete change in a named place.
+    kind: judged
+    rubricFile: acceptance/findings-supported.md
+    threshold: 0.8
+    uses: [steps-resolve]
+
+  - id: filing-matches-request
+    description: Issues are filed only when the request asks and names where, and the answer reports what was filed or why not.
+    kind: judged
+    rubricFile: acceptance/filing-matches-request.md
+    threshold: 0.75
+
+  - id: human-sample
+    description: A person reads one analysis in five, to find what the other criteria miss.
+    kind: human
+    sampleRate: 0.2

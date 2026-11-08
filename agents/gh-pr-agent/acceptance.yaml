@@ -1,0 +1,42 @@
+# What a good PR review is. The harness verifies every answer against this,
+# outside the conversation that wrote it (tap's docs/acceptance.md):
+# deterministic checks first, then judged criteria (each once the checks it
+# uses pass), and a human sample.
+#
+# The agent acts: with write: auto it posts the review comment (or a 👍)
+# during the turn, before verification sees the answer. A reaction is
+# idempotent but a comment is not, so a retry would post a second one. Hence
+# maxAttempts: 1: a failed review is recorded and queued for a person, and
+# never re-posted.
+apiVersion: tavon.ai/acceptance/v1
+kind: Acceptance
+maxAttempts: 1
+verifier:
+  # A model kept for judging, not the agent's, so the judge isn't the author.
+  model: verifier
+criteria:
+  - id: review-format
+    description: The verdict is one of the three and matches the findings' severities; each finding has a known severity and a path:L<n> citation; at most five; a Coverage section.
+    kind: deterministic
+    exec: ["node", "checks/review_format.ts"]
+    timeout: 5s
+
+  - id: citations-resolve
+    description: Every cited file and line range exists in the PR at the head (or, for removed lines, base) sha; the cited lines become evidence for the judge.
+    kind: deterministic
+    exec: ["node", "checks/citations_resolve.ts"]
+    timeout: 60s
+    egress: [api.github.com:443]
+    secrets: [GITHUB_TOKEN]
+
+  - id: findings-grounded
+    description: Each finding is a concrete failure shown by the lines it cites, not an assumption about unseen code or a style nit, with a severity that fits.
+    kind: judged
+    rubricFile: acceptance/findings-grounded.md
+    threshold: 0.8
+    uses: [citations-resolve]
+
+  - id: human-sample
+    description: A person reads one review in five, to find what the other criteria miss (including real problems the review missed).
+    kind: human
+    sampleRate: 0.2

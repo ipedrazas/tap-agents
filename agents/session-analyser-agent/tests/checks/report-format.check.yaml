@@ -1,0 +1,89 @@
+check: report-format
+cases:
+  - name: findings with kinds, step ids and a filing line
+    task: Analyse gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json and file into team ENG, project Agents
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 2 findings
+
+      **[error-handling] get_file retried the same not_found on the base repo**
+      t0.s3, t0.s5 and t0.s7 call get_file with the same arguments and get `{"error":"not_found"}` each time.
+      Why it matters: three wasted calls. Recommended change: in system.md, say to switch to head_repo_full_name after a not_found.
+
+      **[cost] the diff was fetched twice**
+      t0.s1 and t0.s9 call get_pull_request_diff with identical arguments.
+      Recommended change: the gh-pr skill should say the diff does not change within a turn.
+
+      Filed: ENG-42 (created), ENG-17 (updated)
+    expect: { pass: true, reason: "^2 findings" }
+  - name: nothing worth filing
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: Nothing worth filing
+
+      The one tool error (t0.s3) was recovered from with the next call.
+    expect: { pass: true, reason: "nothing worth filing" }
+  - name: not asked to file is a filing line
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: 1 finding
+
+      1. **[tool-use] read the whole file to check one line**
+      t0.s4 reads lines 1-400 of src/app.ts to cite line 12.
+      Recommended change: the get_file description should suggest a narrow window.
+
+      Not filed: not asked to.
+    expect: { pass: true }
+  - name: verdict count disagrees with the findings listed
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: 3 findings
+
+      **[cost] the diff was fetched twice**
+      t0.s1 and t0.s9. Not filed: not asked to.
+    expect: { pass: false, reason: "verdict says 3 findings but the answer lists 1 finding" }
+  - name: a finding without step ids fails
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: 1 finding
+
+      **[tool-use] the agent used tools inefficiently**
+      It made a lot of calls. Not filed: not asked to.
+    expect: { pass: false, reason: "1 finding cites no step id" }
+  - name: an unknown kind fails
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: 1 finding
+
+      **[performance] slow model call**
+      t0.s2 took 90 s. Not filed: not asked to.
+    expect: { pass: false, reason: "unknown kind \\[performance\\]" }
+  - name: no verdict on the first line fails
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      Here is my analysis of the session.
+
+      **[cost] the diff was fetched twice**
+      t0.s1 and t0.s9. Not filed: not asked to.
+    expect: { pass: false, reason: "first line has no verdict" }
+  - name: findings without saying what was filed fail
+    task: Analyse gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json and file into team ENG, project Agents
+    output: |
+      gh-pr-agent 0.3.6, hook, 1 turn: 1 finding
+
+      **[cost] the diff was fetched twice**
+      t0.s1 and t0.s9 call get_pull_request_diff with identical arguments.
+    expect: { pass: false, reason: "does not say what was filed" }
+  - name: more than five findings for one session fails
+    task: Look at gh-pr-agent/0067f3361df88a417c66fc17e06272db.trace.json
+    output: |
+      gh-pr-agent 0.3.6, chat, 1 turn: 6 findings
+
+      **[cost] a** t0.s1
+      **[cost] b** t0.s2
+      **[cost] c** t0.s3
+      **[cost] d** t0.s4
+      **[cost] e** t0.s5
+      **[cost] f** t0.s6
+
+      Not filed: not asked to.
+    expect: { pass: false, reason: "at most five per session" }

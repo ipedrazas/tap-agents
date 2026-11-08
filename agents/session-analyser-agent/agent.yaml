@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: session-analyser-agent
-  version: 0.1.1
+  version: 0.1.2
   owner: "platform"
   description: "Analyses agent session traces from the sessions bucket and files evidence-backed improvement issues in Linear"
 
