@@ -1,0 +1,98 @@
+check: review-format
+cases:
+  - name: a warning review with citations and coverage
+    task: Review https://github.com/acme/app/pull/7
+    output: |
+      **Worth fixing before merge.** Adds a token cache to the auth client.
+
+      1. **[Warning] Correctness: expired tokens are served from the cache**
+         `src/auth.ts:L12-L14`
+         **What happens:** a token cached at 11:59 with a 60 s TTL is returned at 12:05 because the check compares against the creation time.
+         **Fix:** compare `Date.now()` against `expiresAt`.
+
+      **Coverage**: reviewed src/auth.ts; read src/client.ts:L1-L40 for context; nothing skipped.
+    expect: { pass: true, reason: "^Worth fixing before merge; 1 finding" }
+  - name: no findings
+    task: Review https://github.com/acme/app/pull/7
+    output: |
+      No issues worth raising. Bumps the README badge URL.
+
+      ## Coverage
+      Reviewed README.md.
+    expect: { pass: true }
+  - name: a JSON review
+    task: Review https://github.com/acme/app/pull/7 and answer in JSON
+    output: |
+      {"verdict": "Blocking issues found", "findings": [{"severity": "Critical", "category": "Security", "file": "src/run.ts", "start_line": 8, "end_line": 9, "title": "Shell injection", "scenario": "a branch named ';rm -rf /' runs", "fix": "use execFile"}], "coverage": {"reviewed": ["src/run.ts"], "skipped": []}}
+    expect: { pass: true, reason: "^Blocking issues found" }
+  - name: a Critical finding under a non-blocking verdict fails
+    task: q
+    output: |
+      Worth fixing before merge. Adds a shell helper.
+
+      **[Critical] Security: shell injection** `src/run.ts:L8-L9`
+      **What happens:** the branch name is interpolated into a shell command.
+
+      **Coverage**: src/run.ts.
+    expect: { pass: false, reason: "make it \"Blocking issues found\"" }
+  - name: no issues with findings listed fails
+    task: q
+    output: |
+      No issues worth raising.
+
+      **[Warning] Correctness: off by one** `src/a.ts:L3`
+
+      **Coverage**: src/a.ts.
+    expect: { pass: false, reason: "make it \"Worth fixing before merge\"" }
+  - name: a finding without a citation fails
+    task: q
+    output: |
+      Worth fixing before merge. Refactors the cache.
+
+      **[Warning] Performance: the cache is unbounded**
+      **What happens:** memory grows with every key.
+
+      **Coverage**: src/cache.ts.
+    expect: { pass: false, reason: "1 finding has no path:L<n> citation" }
+  - name: an unknown severity fails
+    task: q
+    output: |
+      Worth fixing before merge. x
+
+      **[Nit] Style: naming** `src/a.ts:L3`
+
+      **Coverage**: src/a.ts.
+    expect: { pass: false, reason: "unknown severity \\[Nit\\]" }
+  - name: no verdict on the first line fails
+    task: q
+    output: |
+      Here is my review of the PR.
+
+      **[Warning] Correctness: off by one** `src/a.ts:L3`
+
+      **Coverage**: src/a.ts.
+    expect: { pass: false, reason: "first line is not a verdict" }
+  - name: six findings fail
+    task: q
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] A: a** `a.ts:L1`
+      **[Warning] A: b** `a.ts:L2`
+      **[Warning] A: c** `a.ts:L3`
+      **[Warning] A: d** `a.ts:L4`
+      **[Warning] A: e** `a.ts:L5`
+      **[Warning] A: f** `a.ts:L6`
+
+      **Coverage**: a.ts.
+    expect: { pass: false, reason: "6 findings; at most five" }
+  - name: no coverage section fails
+    task: q
+    output: |
+      No issues worth raising. Fixes a typo.
+    expect: { pass: false, reason: "no Coverage section" }
+  - name: a JSON review missing fields fails
+    task: q
+    output: |
+      {"verdict": "Worth fixing before merge", "findings": [{"severity": "Warning", "file": "a.ts", "start_line": 3, "end_line": 3, "title": "x"}], "coverage": {"reviewed": ["a.ts"], "skipped": []}}
+    expect: { pass: false, reason: "findings\\[0\\] has no \"category\"" }

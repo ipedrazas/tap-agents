@@ -1,0 +1,128 @@
+check: citations-resolve
+cases:
+  - name: cited lines exist and become evidence
+    task: Review https://github.com/acme/app/pull/7
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. Adds a token cache.
+
+      **[Warning] Correctness: expired tokens are served** `src/auth.ts:L3-L4`
+      **What happens:** x
+
+      **Coverage**: src/auth.ts.
+    http: &pr
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/pulls/7"
+        status: 200
+        headers: { content-type: application/json }
+        body: { title: "Cache tokens", head: { sha: "1111111111111111111111111111111111111111", repo: { full_name: acme/app } }, base: { sha: "2222222222222222222222222222222222222222", repo: { full_name: acme/app } } }
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/contents/src/auth.ts?ref=1111111111111111111111111111111111111111"
+        status: 200
+        headers: { content-type: text/plain }
+        body: "const cache = new Map();\nexport function get(k) {\n  const t = cache.get(k);\n  if (t && t.created + 60 > now()) return t;\n  return null;\n}\n"
+    expect: { pass: true, reason: "^1 citation resolved in acme/app#7" }
+  - name: lines past the end of the file fail
+    task: Review https://github.com/acme/app/pull/7
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] Correctness: y** `src/auth.ts:L40-L42`
+
+      **Coverage**: src/auth.ts.
+    http: *pr
+    expect: { pass: false, reason: "src/auth.ts:L40-L42: src/auth.ts has 6 lines at the head sha" }
+  - name: a file in neither sha fails
+    task: Review https://github.com/acme/app/pull/7
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] Correctness: y** `src/missing.ts:L1`
+
+      **Coverage**: src/missing.ts.
+    http:
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/pulls/7"
+        status: 200
+        headers: { content-type: application/json }
+        body: { title: "x", head: { sha: "1111111111111111111111111111111111111111", repo: { full_name: acme/app } }, base: { sha: "2222222222222222222222222222222222222222", repo: { full_name: acme/app } } }
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/contents/src/missing.ts?ref=1111111111111111111111111111111111111111"
+        status: 404
+        body: { message: Not Found }
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/contents/src/missing.ts?ref=2222222222222222222222222222222222222222"
+        status: 404
+        body: { message: Not Found }
+    expect: { pass: false, reason: "src/missing.ts:L1: no such file at the head or base sha" }
+  - name: a removed file resolves at the base sha
+    task: Review acme/app#7
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] Compatibility: removed export still imported** `lib/old.ts:L2` (removed line, old-file number)
+
+      **Coverage**: lib/old.ts.
+    http:
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/pulls/7"
+        status: 200
+        headers: { content-type: application/json }
+        body: { title: "x", head: { sha: "1111111111111111111111111111111111111111", repo: { full_name: acme/app } }, base: { sha: "2222222222222222222222222222222222222222", repo: { full_name: acme/app } } }
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/contents/lib/old.ts?ref=1111111111111111111111111111111111111111"
+        status: 404
+        body: { message: Not Found }
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/contents/lib/old.ts?ref=2222222222222222222222222222222222222222"
+        status: 200
+        headers: { content-type: text/plain }
+        body: "// old\nexport const legacy = 1;\n"
+    expect: { pass: true }
+  - name: a fork PR reads new code from the fork
+    task: Review https://github.com/acme/app/pull/9
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] Correctness: y** `a.ts:L1`
+
+      **Coverage**: a.ts.
+    http:
+      - method: GET
+        url: "https://api.github.com/repos/acme/app/pulls/9"
+        status: 200
+        headers: { content-type: application/json }
+        body: { title: "x", head: { sha: "3333333333333333333333333333333333333333", repo: { full_name: someone/app-fork } }, base: { sha: "2222222222222222222222222222222222222222", repo: { full_name: acme/app } } }
+      - method: GET
+        url: "https://api.github.com/repos/someone/app-fork/contents/a.ts?ref=3333333333333333333333333333333333333333"
+        status: 200
+        headers: { content-type: text/plain }
+        body: "one\n"
+    expect: { pass: true }
+  - name: no findings, nothing to resolve
+    task: Review https://github.com/acme/app/pull/7
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      No issues worth raising. x
+
+      **Coverage**: README.md:L1-L3 read.
+    expect: { pass: true, reason: "nothing to resolve" }
+  - name: a PR that can't be read fails with the reason
+    task: Review https://github.com/acme/private/pull/1
+    secrets: { GITHUB_TOKEN: stub }
+    output: |
+      Worth fixing before merge. x
+
+      **[Warning] Correctness: y** `a.ts:L1`
+
+      **Coverage**: a.ts.
+    http:
+      - method: GET
+        url: "https://api.github.com/repos/acme/private/pulls/1"
+        status: 404
+        body: { message: Not Found }
+    expect: { pass: false, reason: "could not read acme/private#1.*not_found" }
