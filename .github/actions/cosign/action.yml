@@ -1,0 +1,65 @@
+# Install a pinned cosign on a Linux x64 runner, from the actions cache when
+# it holds this exact build, otherwise from the GitHub release through the
+# API, with retries.
+#
+# Why not sigstore/cosign-installer: it downloads from github.com's
+# releases/download route on every run, with ~7 s of retries, and a 504 from
+# that route failed whole publish runs (2026-11-08/09) while the API route
+# kept working.
+#
+# Trust: the binary must match the sha256 pinned by the caller, on a cache hit
+# too, so a tampered cache entry is refused. To bump cosign, take the new
+# cosign-linux-amd64 line from the release's cosign_checksums.txt, after
+# checking that file's signature against release-cosign.pub (cosign
+# verify-blob).
+name: cosign
+description: Install a pinned, checksum-verified cosign, cached between runs
+inputs:
+  version:
+    description: cosign release tag, e.g. v2.5.3
+    required: true
+  sha256:
+    description: sha256 of that release's cosign-linux-amd64
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: check platform
+      if: runner.os != 'Linux' || runner.arch != 'X64'
+      shell: bash
+      run: |
+        echo "::error::this action installs cosign-linux-amd64 only (runner: $RUNNER_OS/$RUNNER_ARCH)"
+        exit 1
+
+    - id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cosign
+        key: cosign-${{ inputs.version }}-linux-amd64-${{ inputs.sha256 }}
+
+    - name: download
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        mkdir -p ~/.cosign
+        for i in 1 2 3 4 5; do
+          gh release download "$VERSION" -R sigstore/cosign -p cosign-linux-amd64 -O ~/.cosign/cosign --clobber && exit 0
+          echo "::warning::cosign $VERSION download failed (attempt $i of 5)"
+          [ "$i" -lt 5 ] && sleep $((i * 10))
+        done
+        echo "::error::could not download cosign $VERSION"
+        exit 1
+
+    - name: verify and add to PATH
+      shell: bash
+      env:
+        SHA256: ${{ inputs.sha256 }}
+      run: |
+        echo "$SHA256  $HOME/.cosign/cosign" | sha256sum --check --strict --quiet \
+          || { echo "::error::cosign does not match the pinned sha256; refusing it"; exit 1; }
+        chmod +x ~/.cosign/cosign
+        echo "$HOME/.cosign" >> "$GITHUB_PATH"
+        ~/.cosign/cosign version 2>/dev/null | grep GitVersion

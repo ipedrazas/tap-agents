@@ -24,12 +24,33 @@ bao_get() { # <path under secret/> <field>
   curl -sSf -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/data/$1" | jq -r ".data.data[\"$2\"]"
 }
 
+# retry <attempts> <command...>: run the command until it succeeds, waiting
+# 5, 10, 20, ... seconds between attempts. For calls over the tailnet, where
+# a fresh runner's path to the LAN can drop for a few seconds.
+retry() {
+  n=$1; shift
+  i=1
+  until "$@"; do
+    [ "$i" -ge "$n" ] && { echo "::error::$1 failed $n times"; return 1; }
+    wait=$((5 << (i - 1)))
+    echo "::warning::$1 failed (attempt $i of $n); retrying in ${wait}s"
+    sleep "$wait"
+    i=$((i + 1))
+  done
+}
+
 # registry_login: the tap-ci push user, for tapctl, cosign and flux (all
-# read the Docker config).
+# read the Docker config). Retried: a login that timed out reaching the
+# registry failed a whole publish run (2026-11-09) while the next job got in.
 registry_login() {
   pw=$(bao_get tap-ci/zot password)
   echo "::add-mask::$pw"
-  printf '%s' "$pw" | docker login "$REGISTRY" -u "$(bao_get tap-ci/zot username)" --password-stdin >/dev/null
+  user=$(bao_get tap-ci/zot username)
+  retry 5 docker_login "$user" "$pw"
+}
+
+docker_login() { # <user> <password>
+  printf '%s' "$2" | docker login "$REGISTRY" -u "$1" --password-stdin >/dev/null
 }
 
 # kube_login: a 30-minute token for tap-ci/tap-ci-runner, minted by OpenBao.

@@ -28,6 +28,8 @@ env:
   TRANSIT_SECRET_ENGINE_PATH: tap-transit
   REGISTRY: registry.hiddenfield.dev
   COSIGN_VERSION: v2.5.3 # same as tap's `task tools`
+  # cosign-linux-amd64 of that release (its cosign_checksums.txt); see .github/actions/cosign.
+  COSIGN_SHA256: 783b5d6c74105401c63946c68d9b2a4e1aab3c8abce043e06b8510b02b623ec9
 
 jobs:
   plan:
@@ -41,9 +43,10 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: tag:tap-ci
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: ./.github/actions/cosign
         with:
-          cosign-release: ${{ env.COSIGN_VERSION }}
+          version: ${{ env.COSIGN_VERSION }}
+          sha256: ${{ env.COSIGN_SHA256 }}
       - name: tap release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,9 +69,10 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: tag:tap-ci
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: ./.github/actions/cosign
         with:
-          cosign-release: ${{ env.COSIGN_VERSION }}
+          version: ${{ env.COSIGN_VERSION }}
+          sha256: ${{ env.COSIGN_SHA256 }}
       - name: tap release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -103,9 +107,10 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: tag:tap-ci
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: ./.github/actions/cosign
         with:
-          cosign-release: ${{ env.COSIGN_VERSION }}
+          version: ${{ env.COSIGN_VERSION }}
+          sha256: ${{ env.COSIGN_SHA256 }}
       - uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
       - name: tap release
         env:
@@ -136,9 +141,10 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: tag:tap-ci
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: ./.github/actions/cosign
         with:
-          cosign-release: ${{ env.COSIGN_VERSION }}
+          version: ${{ env.COSIGN_VERSION }}
+          sha256: ${{ env.COSIGN_SHA256 }}
       - uses: fluxcd/flux2/action@b9c17924adb533d3617ec7de97a7b0f4acc07b39 # v2.9.6
       - name: tap release
         env:
