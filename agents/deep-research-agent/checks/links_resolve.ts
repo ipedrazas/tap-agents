@@ -1,5 +1,6 @@
 // links-resolve: every source URL loads (2xx after redirects) and is not a
-// "page not found" page served with 200. Collects each page's text as
+// "page not found" page served with 200. fetchPage reports non-2xx, blocked
+// and empty pages as errors, which count as not resolving. Collects each page's text as
 // evidence for claims-supported, which reads what the pages say.
 // Reads {task, output, attempt} on stdin; prints {pass, reason, details, evidence}.
 import { fetchPage, isPageError } from "../tools/page.ts";

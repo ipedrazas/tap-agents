@@ -2,7 +2,7 @@ apiVersion: tavon.ai/agent/v1
 kind: Agent
 metadata:
   name: deep-research-agent
-  version: 0.1.3
+  version: 0.1.4
   owner: platform
   description: Researches a question on the web and writes a cited report, in which every factual sentence cites a page that says it. Its answers are verified against acceptance.yaml.
 
@@ -49,7 +49,7 @@ tools:
     effects: read
 
   - name: fetch_page
-    description: Fetch one https page and return its title and readable text (at most 20000 characters), the final URL after redirects, the HTTP status, and whether it looks like a "page not found" page served with 200 (soft_404). Cite only pages you have read with this tool.
+    description: Fetch one https page; returns title, readable text (max 20000 chars), final URL, status and soft_404. Non-2xx, blocked/challenge pages, empty bodies and JS shells return an error code and reason instead. Prefer raw/registry/API endpoints for package and file metadata. Cite only pages read with this.
     input_schema:
       type: object
       properties:
