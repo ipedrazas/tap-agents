@@ -48,3 +48,82 @@ cases:
   - name: rejects plain http
     args: { url: "http://example.org/" }
     expect: { ok: false, error_kind: invalid_args }
+  - name: a 403 bot challenge is an http_403_challenge error
+    args: { url: "https://www.example.com/data" }
+    http:
+      - method: GET
+        url: https://www.example.com/data
+        status: 403
+        headers: { content-type: text/html }
+        body: "<html><head><title>Just a moment...</title></head><body><h1>www.example.com</h1><p>Enable JavaScript and cookies to continue</p></body></html>"
+    expect:
+      ok: true
+      output_schema:
+        type: object
+        required: [error, message, url]
+        properties:
+          error: { const: http_403_challenge }
+          status: { const: 403 }
+          message: { type: string, pattern: "403.*https://www.example.com/data" }
+  - name: a plain 403 is http_403
+    args: { url: "https://private.example.com/report" }
+    http:
+      - { method: GET, url: "https://private.example.com/report", status: 403, headers: { content-type: text/html }, body: "<html><title>Forbidden</title><body>You do not have access.</body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: http_403 } } } }
+  - name: a 404 is an http_404 error, not a page
+    args: { url: "https://gone.example.org/paris" }
+    http:
+      - { method: GET, url: "https://gone.example.org/paris", status: 404, headers: { content-type: text/html }, body: "<html><title>Not Found</title><body><h1>Not Found</h1><p>The requested URL was not found on this server. Please check the address and try again later.</p></body></html>" }
+    expect:
+      ok: true
+      output_schema:
+        type: object
+        required: [error, message]
+        properties:
+          error: { const: http_404 }
+          message: { type: string, pattern: "404.*https://gone.example.org/paris" }
+  - name: a 500 Whitelabel error page is an http_500 error
+    args: { url: "https://app.example.com/api/docs" }
+    http:
+      - { method: GET, url: "https://app.example.com/api/docs", status: 500, headers: { content-type: text/html }, body: "<html><body><h1>Whitelabel Error Page</h1><p>This application has no explicit mapping for /error.</p></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: http_500 } } } }
+  - name: another non-2xx status is http_error with the status in the message
+    args: { url: "https://busy.example.com/" }
+    http:
+      - { method: GET, url: "https://busy.example.com/", status: 503, headers: { content-type: text/html }, body: "<html><body>Service unavailable</body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error, message], properties: { error: { const: http_error }, message: { type: string, pattern: "503" } } } }
+  - name: a 200 with an empty body is an empty_body error
+    args: { url: "https://empty.example.com/" }
+    http:
+      - { method: GET, url: "https://empty.example.com/", status: 200, headers: { content-type: text/html }, body: "<html><head><script>app()</script></head><body><div id=\"root\"></div></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error, message], properties: { error: { const: empty_body }, message: { type: string, pattern: "200" } } } }
+  - name: a 200 challenge page is blocked_challenge
+    args: { url: "https://shielded.example.com/" }
+    http:
+      - { method: GET, url: "https://shielded.example.com/", status: 200, headers: { content-type: text/html }, body: "<html><head><title>Just a moment...</title></head><body><p>Checking your browser before accessing the site.</p></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: blocked_challenge } } } }
+  - name: a 200 Whitelabel Error Page is error_page
+    args: { url: "https://app.example.com/info" }
+    http:
+      - { method: GET, url: "https://app.example.com/info", status: 200, headers: { content-type: text/html }, body: "<html><body><h1>Whitelabel Error Page</h1><p>This application has no explicit mapping for /error, so you are seeing this as a fallback. Wed Nov 04 10:00:00 UTC 2026</p></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: error_page } } } }
+  - name: a French server error page is error_page
+    args: { url: "https://www.example.fr/page" }
+    http:
+      - { method: GET, url: "https://www.example.fr/page", status: 200, headers: { content-type: text/html }, body: "<html><head><title>Erreur</title></head><body><h2>Une erreur inattendue est survenue</h2><p>Veuillez réessayer ultérieurement ou contacter le support si le problème persiste, merci.</p></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: error_page } } } }
+  - name: a client-rendered reconnect shell is js_shell
+    args: { url: "https://spa.example.com/" }
+    http:
+      - { method: GET, url: "https://spa.example.com/", status: 200, headers: { content-type: text/html }, body: "<html><head><title>App</title></head><body><div>Attempting to reconnect</div><div>Attempting to reconnect to the server. Please wait while we restore your session and load the application.</div></body></html>" }
+    expect: { ok: true, output_schema: { type: object, required: [error], properties: { error: { const: js_shell } } } }
+  - name: a short JSON endpoint is still returned as a page
+    args: { url: "https://registry.npmjs.org/left-pad/latest" }
+    http:
+      - { method: GET, url: "https://registry.npmjs.org/left-pad/latest", status: 200, headers: { content-type: application/json }, body: "{\"name\":\"left-pad\",\"version\":\"1.3.0\"}" }
+    expect: { ok: true, output_schema: { type: object, required: [status, text, soft_404], properties: { status: { const: 200 }, soft_404: { const: false }, text: { type: string, pattern: "1\\.3\\.0" } } } }
+  - name: a short plain-text not-found body served with 200 is a soft 404
+    args: { url: "https://files.example.org/data.txt" }
+    http:
+      - { method: GET, url: "https://files.example.org/data.txt", status: 200, headers: { content-type: text/plain }, body: "Not Found" }
+    expect: { ok: true, output_schema: { type: object, required: [soft_404], properties: { soft_404: { const: true }, soft_404_reason: { type: string, pattern: "body" } } } }

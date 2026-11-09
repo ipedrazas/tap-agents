@@ -14,10 +14,20 @@ export type Page = {
   soft_404_reason?: string;
 };
 
-export type PageError = { url: string; error: string; message: string };
+// error is a short code; message says why, with the status and final URL when
+// there was a response, so the caller can pick another route.
+export type PageError = { url: string; error: string; message: string; status?: number; final_url?: string };
 
 const UA = "tap-deep-research/0.1 (+https://tap.hiddenfield.dev)";
 const MAX_BYTES = 2 << 20;
+// Below this many characters an HTML page has nothing worth citing.
+const MIN_TEXT = 100;
+
+// Bot challenges: served with 403/429/503, or sometimes 200.
+const CHALLENGE = /\b(just a moment|checking your browser|attention required|verify you are (?:a )?human|enable javascript and cookies)\b|cf-chl|cf-browser-verification/i;
+// Server error pages and client-rendered shells that carry no content.
+const ERROR_PAGE = /whitelabel error page|une erreur inattendue|la page que vous recherchez n'existe pas/i;
+const JS_SHELL = /attempting to reconnect|you need to enable javascript|please enable javascript/i;
 
 // Titles and headings that say "not found" while the status says 200.
 const NOT_FOUND =
@@ -93,8 +103,22 @@ export function softNotFound(finalUrl: string, title: string, h1: string, text: 
   try {
     if (NOT_FOUND_PATH.test(new URL(finalUrl).pathname)) return `it redirects to an error page (${finalUrl})`;
   } catch {}
-  if (text.length < 100) return `the page has almost no text (${text.length} characters)`;
   return "";
+}
+
+// blockedPage names why a response carries no usable content (challenge,
+// server error page, JS shell, empty body), or returns null. Signatures are
+// looked for in the title, heading and the start of the text, so an article
+// that merely quotes "just a moment" is not rejected.
+function blockedPage(isHtml: boolean, title: string, h1: string, text: string): { error: string; why: string } | null {
+  const head = `${title}\n${h1}\n${text.slice(0, 1000)}`;
+  if (CHALLENGE.test(head)) return { error: "blocked_challenge", why: "it is a bot-challenge page, not the content" };
+  if (ERROR_PAGE.test(head)) return { error: "error_page", why: "it is a server error page, not the content" };
+  if (JS_SHELL.test(head) && (text.length < 1000 || (head.match(JS_SHELL) ?? []).length > 1 || JS_SHELL.test(title)))
+    return { error: "js_shell", why: "it is a client-rendered shell with no content in the HTML" };
+  // JSON, text and other raw endpoints can be short and still be the answer.
+  if (isHtml ? text.length < MIN_TEXT : text.length === 0) return { error: "empty_body", why: `the page has almost no text (${text.length} characters)` };
+  return null;
 }
 
 export async function fetchPage(url: string, timeoutMs = 15_000): Promise<Page | PageError> {
@@ -123,11 +147,27 @@ export async function fetchPage(url: string, timeoutMs = 15_000): Promise<Page |
   const finalUrl = res.url || url;
   const isHtml = /html|xml/i.test(contentType) || /^\s*</.test(raw);
   const { title, h1, text } = isHtml ? htmlToText(raw) : { title: "", h1: "", text: raw.replace(/\s+\n/g, "\n").trim() };
-  const page: Page = { url, final_url: finalUrl, status: res.status, content_type: contentType, title, text, soft_404: false };
-  if (res.ok) {
-    const why = softNotFound(finalUrl, title, h1, text);
-    if (why) Object.assign(page, { soft_404: true, soft_404_reason: why });
+  const fail = (error: string, message: string): PageError => ({ url, error, message: `${message} [status ${res.status}, final URL ${finalUrl}]`, status: res.status, final_url: finalUrl });
+  if (!res.ok) {
+    const blocked = CHALLENGE.test(`${title}\n${h1}\n${text.slice(0, 1000)}`);
+    if (res.status === 403) {
+      return blocked
+        ? fail("http_403_challenge", "HTTP 403: bot-challenge page, the site blocks automated fetches")
+        : fail("http_403", "HTTP 403: access forbidden");
+    }
+    if (res.status === 404) return fail("http_404", "HTTP 404: page not found");
+    if (res.status === 500) return fail("http_500", "HTTP 500: server error");
+    return fail(blocked ? "http_error_challenge" : "http_error", `HTTP ${res.status}${blocked ? ": bot-challenge page" : ""}`);
   }
+  const page: Page = { url, final_url: finalUrl, status: res.status, content_type: contentType, title, text, soft_404: false };
+  // A "not found" page is still reported as a soft 404 page, as before.
+  // Non-HTML has no title or heading; a short body is judged by its text.
+  const why =
+    softNotFound(finalUrl, title, h1, text) ||
+    (!isHtml && text.length < MIN_TEXT && NOT_FOUND.test(text) ? `the response body says "${text.slice(0, 80)}"` : "");
+  if (why) return Object.assign(page, { soft_404: true, soft_404_reason: why });
+  const bad = blockedPage(isHtml, title, h1, text);
+  if (bad) return fail(bad.error, `HTTP ${res.status} but ${bad.why}`);
   return page;
 }
 
